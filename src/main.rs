@@ -1,11 +1,10 @@
 #![feature(let_else)]
 #![feature(option_result_contains)]
+#![feature(let_chains)]
 
 mod walk;
 
-extern crate core;
-
-use std::collections::BTreeMap;
+use serde::{Serialize, Deserialize};
 use std::fmt::{Debug};
 use std::path::PathBuf;
 use sqlx::{ConnectOptions, Executor, SqliteConnection, Row};
@@ -13,7 +12,6 @@ use sqlx::sqlite::SqliteConnectOptions;
 use futures::{Stream, TryStreamExt};
 use filetime::{FileTime, set_file_times};
 use time::{OffsetDateTime, PrimitiveDateTime, UtcOffset};
-use time::format_description::well_known::Iso8601;
 
 use time::macros::format_description;
 
@@ -36,6 +34,47 @@ async fn find_journal(conn: &mut SqliteConnection, name: &str) -> Result<i64, sq
     Ok(result)
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct EntryMetadata {
+    // A constant value of "dayone-import", present in the metadata
+    #[serde(rename = "type")]
+    note_type: String,
+
+    journal: String,
+
+    #[serde(rename = "dayoneId")]
+    uuid: String,
+
+    #[serde(rename = "createdAt", with = "time::serde::rfc3339")]
+    creation_date: OffsetDateTime,
+
+    #[serde(rename = "lastModifiedAt", with = "time::serde::rfc3339")]
+    modified_date: OffsetDateTime,
+
+    link: String,
+}
+
+impl EntryMetadata {
+    pub fn validate(&self) -> bool {
+        self.note_type == "dayone-import"
+    }
+}
+
+impl EntryMetadata {
+    fn new(journal: String, uuid: String, creation_date: OffsetDateTime, modified_date: OffsetDateTime) -> EntryMetadata {
+        EntryMetadata {
+            note_type: "dayone-import".to_string(),
+            journal,
+
+            link: format!("dayone://view?entryId={}", uuid),
+            uuid,
+
+            creation_date,
+            modified_date,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct Entry {
     journal: String,
@@ -46,16 +85,8 @@ pub struct Entry {
 }
 
 impl Entry {
-    fn metadata(&self) -> BTreeMap<&str, String> {
-        let mut metadata = BTreeMap::new();
-        metadata.insert("type", "dayone-import".to_string());
-        metadata.insert("journal", self.journal.clone());
-        metadata.insert("dayoneId", self.uuid.clone());
-        metadata.insert("createdAt", self.creation_date.format(&Iso8601::DEFAULT).unwrap());
-        metadata.insert("lastModifiedAt", self.modified_date.format(&Iso8601::DEFAULT).unwrap());
-        metadata.insert("link", format!("dayone://view?entryId={}", self.uuid));
-
-        metadata
+    fn metadata(&self) -> EntryMetadata {
+        EntryMetadata::new(self.journal.clone(), self.uuid.clone(), self.creation_date, self.modified_date)
     }
 
     fn title(&self) -> String {
@@ -162,7 +193,7 @@ impl Into<Config> for Cli {
 
 #[tokio::main]
 async fn main() -> Result<(), sqlx::Error> {
-    walk::main_2();
+    // walk::main_2();
     let cli: Cli = Cli::parse();
     export_journal(&cli.into()).await
 }

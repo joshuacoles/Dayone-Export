@@ -11,10 +11,11 @@ filetime = "0.2.18"
 futures = "0.3.25"
 rustls = "0.20.7"
 sqlx = { version = "0.6", features = ["runtime-tokio-rustls", "sqlite", "time"] }
-time = { version = "0.3.17", features = ["parsing", "formatting"] }
+time = { version = "0.3.17", features = ["parsing", "formatting", "serde"] }
 tokio = { version = "1", features = ["full"] }
-serde = "1.0"
+serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"
 clap = { version = "4.0.29", features = ["derive"] }
 walkdir = "2.3.2"
 frontmatter = "0.4.0"
+itertools = "0.10.5"

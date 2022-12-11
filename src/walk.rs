@@ -1,9 +1,10 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::path::PathBuf;
 use std::process::exit;
 use walkdir::{DirEntry, WalkDir};
-use crate::Entry;
+use crate::{Entry, EntryMetadata};
+use itertools::Itertools;
 
 fn is_hidden(entry: &DirEntry) -> bool {
     entry.file_name()
@@ -16,43 +17,90 @@ fn is_markdown(entry: &DirEntry) -> bool {
     entry.path().extension().contains(&"md")
 }
 
-pub fn read_existing() -> HashMap<String, PathBuf> {
-    let walker = WalkDir::new("/Users/joshuacoles/Obsidian Sync/My Life").into_iter();
-    let result: HashMap<String, PathBuf> = walker.filter_entry(|e| !is_hidden(e) && is_markdown(e))
-        .filter_map(|e| e.ok())
-        .filter_map(|entry| {
-            parse_metadata(&entry)
-                .map(|entry_info| (entry_info.uuid, entry.into_path()))
-        }).collect();
+fn parse_entry(p0: &DirEntry) -> Option<Entry> {
+    let contents = fs::read_to_string(p0.path()).unwrap();
+    let mut lines = contents.lines();
 
-    result
+    let first_line = lines.next()?;
+
+    if first_line != "---" {
+        return None;
+    }
+
+    let metadata_block = lines
+        .take_while_ref(|line| *line != "---")
+        .join("\n");
+
+    let meta = serde_yaml::from_str::<EntryMetadata>(&metadata_block).ok()?;
+
+    if !meta.validate() {
+        return None
+    }
+
+    // Read next "---" which is left by the take while
+    lines.next()?;
+
+    let rest = lines.join("\n");
+
+    Some(Entry {
+        journal: meta.journal,
+        uuid: meta.uuid,
+        creation_date: meta.creation_date,
+        modified_date: meta.modified_date,
+        markdown: rest,
+    })
 }
 
-pub fn write(existing: HashMap<String, PathBuf>, entries: Vec<Entry>) {
-    for entry in entries {
-        match existing.get(&entry.uuid) {
-            Some(path) => {
-                let should_overwrite = true;
+struct Vault {
+    root: PathBuf,
+    default_export: PathBuf,
+    should_overwrite_existing: bool,
+}
 
-                if should_overwrite {
-                    fs::write(path, entry.contents()).unwrap();
+impl Vault {
+    fn read_existing(&self) -> HashMap<String, PathBuf> {
+        let walker = WalkDir::new(&self.root).into_iter();
+        let result: HashMap<String, PathBuf> = walker.filter_entry(|e| !is_hidden(e) && is_markdown(e))
+            .filter_map(|e| e.ok())
+            .filter_map(|entry| {
+                parse_entry(&entry)
+                    .map(|entry_info| (entry_info.uuid, entry.into_path()))
+            }).collect();
+
+        result
+    }
+
+    fn should_overwrite(&self, _entry: &Entry, _path: &PathBuf) -> bool {
+        self.should_overwrite_existing
+    }
+
+    fn export_entries(&self, entries: Vec<Entry>) {
+        let existing = self.read_existing();
+
+        for entry in entries {
+            match existing.get(&entry.uuid) {
+                Some(path) => {
+                    if self.should_overwrite(&entry, path) {
+                        fs::write(path, entry.contents()).unwrap();
+                    }
                 }
-            },
-            None => {
-                let root: PathBuf = PathBuf::new();
-                fs::write(root.join(entry.default_filename()), entry.contents()).unwrap();
+
+                None => {
+                    fs::write(self.default_export.join(entry.default_filename()), entry.contents()).unwrap();
+                }
             }
         }
     }
 }
 
 pub fn main_2() -> ! {
-    let existing = read_existing();
-    write(existing, Vec::new());
+    let vault = Vault {
+        root: PathBuf::from("/Users/joshuacoles/Developer/checkouts/joshuacoles/dayone-export-standalone/out"),
+        default_export: PathBuf::from("/Users/joshuacoles/Developer/checkouts/joshuacoles/dayone-export-standalone/out/journals"),
+        should_overwrite_existing: true,
+    };
 
-    exit(0);
-}
+    vault.export_entries(vec![]);
 
-fn parse_metadata(p0: &DirEntry) -> Option<Entry> {
-    todo!()
+    exit(0)
 }
