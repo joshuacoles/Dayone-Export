@@ -5,8 +5,9 @@ use std::path::PathBuf;
 use std::process::exit;
 use futures::TryStreamExt;
 use walkdir::{DirEntry, WalkDir};
-use crate::{Entry, EntryMetadata, Stream};
+use crate::Stream;
 use itertools::Itertools;
+use crate::entry::{Entry, EntryMetadata};
 
 fn is_hidden(entry: &DirEntry) -> bool {
     entry.file_name()

@@ -1,8 +1,9 @@
 use std::path::PathBuf;
 use filetime::{FileTime, set_file_times};
-use crate::{Entry, Stream, TryStreamExt};
+use crate::{Stream, TryStreamExt};
 use crate::walk::Vault;
 use anyhow::Result;
+use crate::entry::Entry;
 
 pub async fn basic_export(entries: &mut (impl Stream<Item = sqlx::Result<Entry>> + Unpin), journal_root: PathBuf) -> Result<()> {
     while let Some(entry) = entries.try_next().await? {

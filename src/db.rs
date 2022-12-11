@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 use time::{PrimitiveDateTime, UtcOffset};
-use crate::{ConnectOptions, Entry, Executor, Row, SqliteConnection, SqliteConnectOptions, Stream, TryStreamExt};
+use crate::{ConnectOptions, Executor, Row, SqliteConnection, SqliteConnectOptions, Stream, TryStreamExt};
+use crate::entry::Entry;
 
 pub async fn connect_db(database_file: &PathBuf) -> sqlx::Result<SqliteConnection> {
     SqliteConnectOptions::new()
