@@ -32,7 +32,11 @@ pub fn write(existing: HashMap<String, PathBuf>, entries: Vec<Entry>) {
     for entry in entries {
         match existing.get(&entry.uuid) {
             Some(path) => {
-                fs::write(path, entry.contents()).unwrap();
+                let should_overwrite = true;
+
+                if should_overwrite {
+                    fs::write(path, entry.contents()).unwrap();
+                }
             },
             None => {
                 let root: PathBuf = PathBuf::new();
@@ -44,7 +48,7 @@ pub fn write(existing: HashMap<String, PathBuf>, entries: Vec<Entry>) {
 
 pub fn main_2() -> ! {
     let existing = read_existing();
-    write(existing, Vec::new())
+    write(existing, Vec::new());
 
     exit(0);
 }
