@@ -1,9 +1,11 @@
 use std::collections::HashMap;
 use std::fs;
+use std::future::Future;
 use std::path::PathBuf;
 use std::process::exit;
+use futures::TryStreamExt;
 use walkdir::{DirEntry, WalkDir};
-use crate::{Entry, EntryMetadata};
+use crate::{Entry, EntryMetadata, Stream};
 use itertools::Itertools;
 
 fn is_hidden(entry: &DirEntry) -> bool {
@@ -51,10 +53,10 @@ fn parse_entry(p0: &DirEntry) -> Option<Entry> {
     })
 }
 
-struct Vault {
-    root: PathBuf,
-    default_export: PathBuf,
-    should_overwrite_existing: bool,
+pub struct Vault {
+    pub root: PathBuf,
+    pub default_export: PathBuf,
+    pub should_overwrite_existing: bool,
 }
 
 impl Vault {
@@ -74,33 +76,23 @@ impl Vault {
         self.should_overwrite_existing
     }
 
-    fn export_entries(&self, entries: Vec<Entry>) {
+    pub async fn export_entries(&self, entries: &mut (impl Stream<Item=sqlx::Result<Entry>> + Unpin)) -> Result<(), anyhow::Error> {
         let existing = self.read_existing();
 
-        for entry in entries {
+        while let Some(entry) = entries.try_next().await? {
             match existing.get(&entry.uuid) {
                 Some(path) => {
                     if self.should_overwrite(&entry, path) {
-                        fs::write(path, entry.contents()).unwrap();
+                        tokio::fs::write(path, entry.contents()).await?;
                     }
                 }
 
                 None => {
-                    fs::write(self.default_export.join(entry.default_filename()), entry.contents()).unwrap();
+                    tokio::fs::write(self.default_export.join(entry.default_filename()), entry.contents()).await?;
                 }
             }
         }
+
+        Ok(())
     }
-}
-
-pub fn main_2() -> ! {
-    let vault = Vault {
-        root: PathBuf::from("/Users/joshuacoles/Developer/checkouts/joshuacoles/dayone-export-standalone/out"),
-        default_export: PathBuf::from("/Users/joshuacoles/Developer/checkouts/joshuacoles/dayone-export-standalone/out/journals"),
-        should_overwrite_existing: true,
-    };
-
-    vault.export_entries(vec![]);
-
-    exit(0)
 }

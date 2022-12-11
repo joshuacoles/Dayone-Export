@@ -12,7 +12,6 @@ use std::path::PathBuf;
 use sqlx::{ConnectOptions, Error, Executor, Row, SqliteConnection};
 use sqlx::sqlite::SqliteConnectOptions;
 use futures::{Stream, TryStreamExt};
-use filetime::set_file_times;
 use time::{OffsetDateTime};
 
 use time::macros::format_description;
@@ -103,7 +102,7 @@ impl Entry {
     }
 }
 
-async fn export_journal(config: &Config) -> Result<(), sqlx::Error> {
+async fn export_journal(config: &Config) -> anyhow::Result<()> {
     let mut conn = db::connect_db(&config.database_file).await?;
     let mut entries = db::get_entries(&mut conn, &config.journal_name).await?;
 
@@ -138,7 +137,7 @@ impl From<Cli> for Config {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), sqlx::Error> {
+async fn main() -> anyhow::Result<()> {
     // walk::main_2();
     let cli: Cli = Cli::parse();
     export_journal(&cli.into()).await
