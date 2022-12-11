@@ -1,15 +1,15 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use time::{PrimitiveDateTime, UtcOffset};
-use crate::{ConnectOptions, Entry, Error, Executor, Row, SqliteConnection, SqliteConnectOptions, Stream, TryStreamExt};
+use crate::{ConnectOptions, Entry, Executor, Row, SqliteConnection, SqliteConnectOptions, Stream, TryStreamExt};
 
-pub async fn connect_db(database_file: &PathBuf) -> Result<SqliteConnection, sqlx::Error> {
+pub async fn connect_db(database_file: &PathBuf) -> sqlx::Result<SqliteConnection> {
     SqliteConnectOptions::new()
         .filename(database_file)
         .read_only(true)
         .connect().await
 }
 
-async fn find_journal(conn: &mut SqliteConnection, name: &str) -> Result<i64, sqlx::Error> {
+async fn find_journal(conn: &mut SqliteConnection, name: &str) -> sqlx::Result<i64> {
     let journal = conn.fetch_one(
         sqlx::query("
             select Z_PK as id
@@ -22,13 +22,13 @@ async fn find_journal(conn: &mut SqliteConnection, name: &str) -> Result<i64, sq
     Ok(result)
 }
 
-pub async fn get_entries<'a>(conn: &'a mut SqliteConnection, journal_name: &str) -> sqlx::Result<impl Stream<Item=Result<Entry, Error>> + Sized  + 'a> {
+pub async fn get_entries<'a>(conn: &'a mut SqliteConnection, journal_name: &str) -> sqlx::Result<impl Stream<Item=sqlx::Result<Entry>> + Sized  + 'a> {
     let id = find_journal(conn, journal_name).await?;
     let entries = entries_for_journal(conn, id);
     Ok(entries)
 }
 
-pub fn entries_for_journal(conn: &mut SqliteConnection, id: i64) -> impl Stream<Item=Result<Entry, sqlx::Error>> + '_ {
+pub fn entries_for_journal(conn: &mut SqliteConnection, id: i64) -> impl Stream<Item=sqlx::Result<Entry>> + '_ {
     let entries = conn.fetch(
         sqlx::query("
             select journal.ZNAME                                    as journal,

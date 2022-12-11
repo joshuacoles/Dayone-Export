@@ -11,9 +11,9 @@ use std::fmt::Debug;
 use std::path::PathBuf;
 use sqlx::{ConnectOptions, Error, Executor, Row, SqliteConnection};
 use sqlx::sqlite::SqliteConnectOptions;
-use futures::{Stream, StreamExt, TryStreamExt};
-use filetime::{FileTime, set_file_times};
-use time::{OffsetDateTime, UtcOffset};
+use futures::{Stream, TryStreamExt};
+use filetime::set_file_times;
+use time::{OffsetDateTime};
 
 use time::macros::format_description;
 
