@@ -4,13 +4,14 @@
 
 mod walk;
 mod db;
+mod basic;
 
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use std::path::PathBuf;
 use sqlx::{ConnectOptions, Error, Executor, Row, SqliteConnection};
 use sqlx::sqlite::SqliteConnectOptions;
-use futures::{Stream, TryStreamExt};
+use futures::{Stream, StreamExt, TryStreamExt};
 use filetime::{FileTime, set_file_times};
 use time::{OffsetDateTime, UtcOffset};
 
@@ -109,24 +110,11 @@ async fn export_journal(config: &Config) -> Result<(), sqlx::Error> {
     let journal_root = config.export_root.join(config.journal_name.replace('/', "-"));
     tokio::fs::create_dir_all(&journal_root).await?;
 
-    while let Some(entry) = entries.try_next().await? {
-        let file_name = entry.default_filename();
-
-        let file_path = journal_root.join(file_name);
-
-        tokio::fs::write(&file_path, entry.contents()).await?;
-
-        set_file_times(
-            &file_path,
-            FileTime::from_unix_time(entry.creation_date.unix_timestamp(), 0),
-            FileTime::now(),
-        )?;
-    }
-
-    Ok(())
+    basic_export(&mut entries, journal_root).await
 }
 
 use clap::Parser;
+use crate::basic::basic_export;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
