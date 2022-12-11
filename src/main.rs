@@ -3,15 +3,16 @@
 #![feature(let_chains)]
 
 mod walk;
+mod db;
 
-use serde::{Serialize, Deserialize};
-use std::fmt::{Debug};
+use serde::{Deserialize, Serialize};
+use std::fmt::Debug;
 use std::path::PathBuf;
-use sqlx::{ConnectOptions, Executor, SqliteConnection, Row};
+use sqlx::{ConnectOptions, Error, Executor, Row, SqliteConnection};
 use sqlx::sqlite::SqliteConnectOptions;
 use futures::{Stream, TryStreamExt};
 use filetime::{FileTime, set_file_times};
-use time::{OffsetDateTime, PrimitiveDateTime, UtcOffset};
+use time::{OffsetDateTime, UtcOffset};
 
 use time::macros::format_description;
 
@@ -19,19 +20,6 @@ struct Config {
     journal_name: String,
     export_root: PathBuf,
     database_file: PathBuf,
-}
-
-async fn find_journal(conn: &mut SqliteConnection, name: &str) -> Result<i64, sqlx::Error> {
-    let journal = conn.fetch_one(
-        sqlx::query("
-            select Z_PK as id
-            from ZJOURNAL
-            where ZNAME = ?;
-        ").bind(name)
-    ).await?;
-
-    let result: i64 = journal.try_get("id")?;
-    Ok(result)
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -114,39 +102,9 @@ impl Entry {
     }
 }
 
-fn entries_for_journal(conn: &mut SqliteConnection, id: i64) -> impl Stream<Item=Result<Entry, sqlx::Error>> + '_ {
-    let entries = conn.fetch(
-        sqlx::query("
-            select journal.ZNAME                                    as journal,
-                   ZUUID                                            as uuid,
-                   ZMARKDOWNTEXT                                    as markdown,
-                   datetime(ZCREATIONDATE, 'unixepoch', '31 years') as creation_date,
-                   datetime(ZMODIFIEDDATE, 'unixepoch', '31 years') as modified_date
-            from ZENTRY
-                     left join ZJOURNAL journal on ZENTRY.ZJOURNAL = journal.Z_PK
-                     left join Z_12TAGS tag_entry on ZENTRY.Z_PK = tag_entry.Z_12ENTRIES
-                     left join ZTAG tag on tag.Z_PK = tag_entry.Z_45TAGS1
-            where journal.Z_PK = ?
-              and (tag.ZNAME != 'grateful' or tag.ZNAME is null);
-    ").bind(id));
-
-    entries.map_ok(|row| Entry {
-        uuid: row.get("uuid"),
-        journal: row.get("journal"),
-        markdown: row.get("markdown"),
-        creation_date: row.get::<'_, PrimitiveDateTime, _>("creation_date").assume_offset(UtcOffset::UTC),
-        modified_date: row.get::<'_, PrimitiveDateTime, _>("modified_date").assume_offset(UtcOffset::UTC),
-    })
-}
-
 async fn export_journal(config: &Config) -> Result<(), sqlx::Error> {
-    let mut conn = SqliteConnectOptions::new()
-        .filename(&config.database_file)
-        .read_only(true)
-        .connect().await?;
-
-    let id = find_journal(&mut conn, &config.journal_name).await?;
-    let mut entries = entries_for_journal(&mut conn, id);
+    let mut conn = db::connect_db(&config.database_file).await?;
+    let mut entries = db::get_entries(&mut conn, &config.journal_name).await?;
 
     let journal_root = config.export_root.join(config.journal_name.replace('/', "-"));
     tokio::fs::create_dir_all(&journal_root).await?;
@@ -181,12 +139,12 @@ struct Cli {
     database: PathBuf,
 }
 
-impl Into<Config> for Cli {
-    fn into(self) -> Config {
+impl From<Cli> for Config {
+    fn from(cli: Cli) -> Self {
         Config {
-            journal_name: self.journal,
-            export_root: self.output,
-            database_file: self.database,
+            journal_name: cli.journal,
+            export_root: cli.output,
+            database_file: cli.database,
         }
     }
 }
