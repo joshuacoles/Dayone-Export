@@ -42,7 +42,7 @@ pub fn entries_for_journal(conn: &mut SqliteConnection, id: i64) -> impl Stream<
                      left join Z_12TAGS tag_entry on ZENTRY.Z_PK = tag_entry.Z_12ENTRIES
                      left join ZTAG tag on tag.Z_PK = tag_entry.Z_45TAGS1
             where journal.Z_PK = ?
-              and (tag.ZNAME != 'grateful' or tag.ZNAME is null);
+              and (tag.ZNAME != 'grateful' or tag.ZNAME is null and tag.ZNAME == 'obsidian');
     ").bind(id));
 
     entries.map_ok(|row| Entry {
