@@ -21,7 +21,7 @@ fn is_markdown(entry: &DirEntry) -> bool {
 }
 
 fn parse_entry(p0: &DirEntry) -> Option<Entry> {
-    let contents = fs::read_to_string(p0.path()).unwrap();
+    let contents = fs::read_to_string(p0.path()).expect("Failed to read existing entry");
     let mut lines = contents.lines();
 
     let first_line = lines.next()?;

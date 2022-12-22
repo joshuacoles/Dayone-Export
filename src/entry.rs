@@ -61,14 +61,14 @@ impl Entry {
         match self.markdown.trim().split('\n').next() {
             Some(first_line) if first_line.starts_with('#') => first_line.replace('#', "").trim().to_string(),
             Some(first_line) if first_line.chars().all(|x| x.is_whitespace() || x.is_alphanumeric()) => first_line.to_string(),
-            _ => self.creation_date.format(format_description!("[hour]-[minute]-[second]")).unwrap()
+            _ => self.creation_date.format(format_description!("[hour]-[minute]-[second]")).expect("Failed to format time")
         }
     }
 
     pub fn contents(&self) -> String {
         format!(
             "---\n{frontmatter}---\n\n{body}\n",
-            frontmatter = serde_yaml::to_string(&self.metadata()).unwrap(),
+            frontmatter = serde_yaml::to_string(&self.metadata()).expect("Failed to serialise metadata"),
             body = self.markdown.replace('\\', ""),
         )
     }
@@ -77,7 +77,7 @@ impl Entry {
         format!(
             "{} {}.md",
             self.creation_date.format(format_description!("[year]-[month]-[day]")).expect("Failed to format date"),
-            self.title(),
+            self.title().replace("/", " "),
         )
     }
 }

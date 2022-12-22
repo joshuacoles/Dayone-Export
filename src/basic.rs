@@ -1,8 +1,9 @@
+use std::fmt::format;
 use std::path::PathBuf;
 use filetime::{FileTime, set_file_times};
 use crate::{Stream, TryStreamExt};
 use crate::walk::Vault;
-use anyhow::Result;
+use anyhow::{Context, Result};
 use crate::entry::Entry;
 
 pub async fn basic_export(entries: &mut (impl Stream<Item = sqlx::Result<Entry>> + Unpin), journal_root: PathBuf) -> Result<()> {
@@ -11,7 +12,8 @@ pub async fn basic_export(entries: &mut (impl Stream<Item = sqlx::Result<Entry>>
 
         let file_path = journal_root.join(file_name);
 
-        tokio::fs::write(&file_path, entry.contents()).await?;
+        tokio::fs::write(&file_path, entry.contents()).await
+            .context(format!("Writing entry {} to '{:?}'", entry.uuid, &file_path))?;
 
         set_file_times(
             &file_path,

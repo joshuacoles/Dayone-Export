@@ -9,6 +9,7 @@ mod entry;
 
 use std::fmt::Debug;
 use std::path::PathBuf;
+use anyhow::Context;
 use sqlx::{ConnectOptions, Executor, Row, SqliteConnection};
 use sqlx::sqlite::SqliteConnectOptions;
 use futures::{Stream, TryStreamExt};
@@ -20,14 +21,14 @@ struct Config {
 }
 
 async fn export_journal(config: &Config) -> anyhow::Result<()> {
-    let mut conn = db::connect_db(&config.database_file).await?;
-    let mut entries = db::get_entries(&mut conn, &config.journal_name).await?;
+    let mut conn = db::connect_db(&config.database_file).await.expect("Failed to connect to database");
+    let mut entries = db::get_entries(&mut conn, &config.journal_name).await.expect("Failed read entries from database");
 
     let journal_root = config.export_root.join(config.journal_name.replace('/', "-"));
-    tokio::fs::create_dir_all(&journal_root).await?;
+    tokio::fs::create_dir_all(&journal_root).await.context("Creating root")?;
 
     basic_export(&mut entries, journal_root).await?;
-    walk_export(&mut entries).await?;
+    // walk_export(&mut entries).await?;
 
     Ok(())
 }
