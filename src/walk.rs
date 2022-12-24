@@ -58,8 +58,9 @@ pub struct Vault {
 impl Vault {
     fn read_existing(&self) -> HashMap<String, PathBuf> {
         let walker = WalkDir::new(&self.root).into_iter();
-        let result: HashMap<String, PathBuf> = walker.filter_entry(|e| !is_hidden(e) && is_markdown(e))
+        let result: HashMap<String, PathBuf> = walker
             .filter_map(|e| e.ok())
+            .filter(|e| !is_hidden(e) && is_markdown(e))
             .filter_map(|entry| {
                 parse_entry(&entry)
                     .map(|entry_info| (entry_info.metadata.uuid, entry.into_path()))
@@ -74,6 +75,12 @@ impl Vault {
 
     pub async fn export_entries(&self, entries: &mut (impl Stream<Item=sqlx::Result<Entry>> + Unpin)) -> Result<(), anyhow::Error> {
         let existing = self.read_existing();
+
+        println!("Found {} existing entries", existing.len());
+
+        if self.should_overwrite_existing {
+            println!("These will be overwriten in place with updated content");
+        }
 
         while let Some(entry) = entries.try_next().await? {
             match existing.get(&entry.metadata.uuid) {

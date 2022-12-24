@@ -12,7 +12,7 @@ use anyhow::Context;
 use sqlx::{ConnectOptions, Executor, Row, SqliteConnection};
 use sqlx::sqlite::SqliteConnectOptions;
 use futures::{Stream, TryStreamExt};
-use clap::{Arg, Parser};
+use clap::Parser;
 use crate::walk::Vault;
 
 struct Config {
