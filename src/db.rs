@@ -51,7 +51,8 @@ pub fn entries_for_journal(conn: &mut SqliteConnection, id: i64) -> impl Stream<
             row.get("journal"),
             row.get("uuid"),
             row.get::<'_, PrimitiveDateTime, _>("creation_date").assume_offset(UtcOffset::UTC),
-            row.get::<'_, PrimitiveDateTime, _>("modified_date").assume_offset(UtcOffset::UTC)
+            row.get::<'_, PrimitiveDateTime, _>("modified_date").assume_offset(UtcOffset::UTC),
+            Vec::new(),
         ),
     })
 }

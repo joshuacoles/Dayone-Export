@@ -21,7 +21,7 @@ struct Config {
 
     vault_root: PathBuf,
     new_entries_location: PathBuf,
-    should_overwrite_existing: bool,
+    should_update_existing: bool,
 }
 
 async fn export_journal(config: &Config) -> anyhow::Result<()> {
@@ -34,7 +34,7 @@ async fn export_journal(config: &Config) -> anyhow::Result<()> {
     let vault = Vault {
         root: config.vault_root.clone(),
         default_export: config.new_entries_location.clone(),
-        should_overwrite_existing: config.should_overwrite_existing,
+        should_update_existing: config.should_update_existing,
     };
 
     vault.export_entries(&mut entries).await?;
@@ -57,8 +57,8 @@ struct Cli {
     #[arg(long, short = 'o', help = "Where to place new entries that have not yet been exported")]
     default_output: PathBuf,
 
-    #[arg(short = 'w', long = "overwrite", help = "If we should write over file which have been")]
-    should_overwrite_existing: bool,
+    #[arg(short = 'w', long = "overwrite", help = "If existing files should be updated with newer DayOne content if available")]
+    should_update_existing: bool,
 }
 
 impl From<Cli> for Config {
@@ -70,7 +70,7 @@ impl From<Cli> for Config {
             vault_root: cli.vault,
             new_entries_location: cli.default_output,
 
-            should_overwrite_existing: cli.should_overwrite_existing,
+            should_update_existing: cli.should_update_existing,
         }
     }
 }

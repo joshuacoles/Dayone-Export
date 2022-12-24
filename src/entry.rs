@@ -20,6 +20,8 @@ pub struct EntryMetadata {
     pub modified_date: OffsetDateTime,
 
     pub link: String,
+    
+    pub tags: Vec<String>
 }
 
 impl EntryMetadata {
@@ -29,13 +31,14 @@ impl EntryMetadata {
 }
 
 impl EntryMetadata {
-    pub fn new(journal: String, uuid: String, creation_date: OffsetDateTime, modified_date: OffsetDateTime) -> EntryMetadata {
+    pub fn new(journal: String, uuid: String, creation_date: OffsetDateTime, modified_date: OffsetDateTime, tags: Vec<String>) -> EntryMetadata {
         EntryMetadata {
             note_type: "dayone-import".to_string(),
             journal,
 
             link: format!("dayone://view?entryId={}", uuid),
             uuid,
+            tags,
 
             creation_date,
             modified_date,

@@ -52,25 +52,21 @@ fn parse_entry(p0: &DirEntry) -> Option<Entry> {
 pub struct Vault {
     pub root: PathBuf,
     pub default_export: PathBuf,
-    pub should_overwrite_existing: bool,
+    pub should_update_existing: bool,
 }
 
 impl Vault {
-    fn read_existing(&self) -> HashMap<String, PathBuf> {
+    fn read_existing(&self) -> HashMap<String, (PathBuf, Entry)> {
         let walker = WalkDir::new(&self.root).into_iter();
-        let result: HashMap<String, PathBuf> = walker
+        let result: HashMap<String, (PathBuf, Entry)> = walker
             .filter_map(|e| e.ok())
             .filter(|e| !is_hidden(e) && is_markdown(e))
             .filter_map(|entry| {
                 parse_entry(&entry)
-                    .map(|entry_info| (entry_info.metadata.uuid, entry.into_path()))
+                    .map(|entry_info| (entry_info.metadata.uuid.clone(), (entry.into_path(), entry_info)))
             }).collect();
 
         result
-    }
-
-    fn should_overwrite(&self, _entry: &Entry, _path: &PathBuf) -> bool {
-        self.should_overwrite_existing
     }
 
     pub async fn export_entries(&self, entries: &mut (impl Stream<Item=sqlx::Result<Entry>> + Unpin)) -> Result<(), anyhow::Error> {
@@ -78,14 +74,15 @@ impl Vault {
 
         println!("Found {} existing entries", existing.len());
 
-        if self.should_overwrite_existing {
-            println!("These will be overwriten in place with updated content");
+        if self.should_update_existing {
+            println!("These will be overwritten in place with updated content if newer DayOne content is available.");
         }
 
         while let Some(entry) = entries.try_next().await? {
             match existing.get(&entry.metadata.uuid) {
-                Some(path) => {
-                    if self.should_overwrite(&entry, path) {
+                Some((path, existing_entry)) => {
+                    if self.should_update_existing && existing_entry.metadata.modified_date < entry.metadata.modified_date {
+                        println!("Updating entry at {}", path.to_string_lossy());
                         tokio::fs::write(path, entry.contents()).await?;
                     }
                 }
