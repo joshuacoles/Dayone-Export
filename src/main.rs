@@ -45,7 +45,7 @@ async fn export_journal(config: &Config) -> anyhow::Result<()> {
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Cli {
-    #[arg(long, short, help = "THe name of the journal to be exported")]
+    #[arg(long, short, help = "The name of the journal to be exported")]
     journal: String,
 
     #[arg(long, short, help = "Path to the dayone sqlite database")]
