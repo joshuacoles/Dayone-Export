@@ -78,9 +78,9 @@ impl Entry {
 
     pub fn default_filename(&self) -> String {
         format!(
-            "{} {}.md",
+            "{} {}",
             self.metadata.creation_date.format(format_description!("[year]-[month]-[day]")).expect("Failed to format date"),
-            self.title().replace("/", " "),
+            self.title().replace('/', " "),
         )
     }
 }

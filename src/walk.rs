@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use futures::{Stream, TryStreamExt};
 use walkdir::{DirEntry, WalkDir};
 use crate::entry::{Entry, parse_entry};
@@ -7,7 +7,7 @@ use crate::entry::{Entry, parse_entry};
 fn is_hidden(entry: &DirEntry) -> bool {
     entry.file_name()
         .to_str()
-        .map(|s| s.starts_with("."))
+        .map(|s| s.starts_with('.'))
         .unwrap_or(false)
 }
 
@@ -38,6 +38,8 @@ impl Vault {
     }
 
     pub async fn export_entries(&self, entries: &mut (impl Stream<Item=sqlx::Result<Entry>> + Unpin), existing: &HashMap<String, (PathBuf, Entry)>) -> Result<(), anyhow::Error> {
+        println!("Found {} existing entries", existing.len());
+
         if self.should_update_existing {
             println!("These will be overwritten in place with updated content if newer DayOne content is available.");
         }
@@ -52,9 +54,8 @@ impl Vault {
                 }
 
                 None => {
-                    let path = if self.group_by_journal { self.default_export.join(&entry.metadata.journal) } else { self.default_export.clone() };
-                    let path = path.join(entry.default_filename());
-
+                    let parent = if self.group_by_journal { self.default_export.join(&entry.metadata.journal) } else { self.default_export.clone() };
+                    let path = number_existing(&parent, &entry.default_filename(), "md");
                     tokio::fs::write(path, entry.contents()).await?;
                 }
             }
@@ -62,4 +63,22 @@ impl Vault {
 
         Ok(())
     }
+}
+
+fn number_existing(root: &Path, name: &str, extension: &str) -> PathBuf {
+    let mut path = root.join(format!("{}.{}", name, extension));
+    let mut i = 2;
+
+    while path.exists() {
+        path = path.with_file_name(format!(
+            "{name} ({i}).{extension}",
+            name = name,
+            extension = extension,
+            i = i
+        ));
+
+        i += 1;
+    }
+
+    path
 }
