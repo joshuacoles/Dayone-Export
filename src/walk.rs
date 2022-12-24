@@ -35,7 +35,7 @@ fn parse_entry(p0: &DirEntry) -> Option<Entry> {
     let metadata = serde_yaml::from_str::<EntryMetadata>(&metadata_block).ok()?;
 
     if !metadata.validate() {
-        return None
+        return None;
     }
 
     // Read next "---" which is left by the take while
@@ -53,6 +53,7 @@ pub struct Vault {
     pub root: PathBuf,
     pub default_export: PathBuf,
     pub should_update_existing: bool,
+    pub group_by_journal: bool,
 }
 
 impl Vault {
@@ -88,7 +89,10 @@ impl Vault {
                 }
 
                 None => {
-                    tokio::fs::write(self.default_export.join(entry.default_filename()), entry.contents()).await?;
+                    let path = if self.group_by_journal { self.default_export.join(&entry.metadata.journal) } else { self.default_export.clone() };
+                    let path = path.join(entry.default_filename());
+
+                    tokio::fs::write(path, entry.contents()).await?;
                 }
             }
         }

@@ -19,25 +19,22 @@ struct Config {
     journal_name: String,
     database_file: PathBuf,
 
-    vault_root: PathBuf,
-    new_entries_location: PathBuf,
-    should_update_existing: bool,
+    vault: Vault,
 }
 
 async fn export_journal(config: &Config) -> anyhow::Result<()> {
     let mut conn = db::connect_db(&config.database_file).await.expect("Failed to connect to database");
     let mut entries = db::get_entries(&mut conn, &config.journal_name).await.expect("Failed read entries from database");
 
-    tokio::fs::create_dir_all(&config.new_entries_location)
+    tokio::fs::create_dir_all(&config.vault.default_export)
         .await.context("Creating new entries export location")?;
 
-    let vault = Vault {
-        root: config.vault_root.clone(),
-        default_export: config.new_entries_location.clone(),
-        should_update_existing: config.should_update_existing,
-    };
+    if config.vault.group_by_journal {
+        tokio::fs::create_dir_all(&config.vault.default_export.join(&config.journal_name))
+            .await.context("Creating journal specific new entries export location")?;
+    }
 
-    vault.export_entries(&mut entries).await?;
+    config.vault.export_entries(&mut entries).await?;
 
     Ok(())
 }
@@ -47,6 +44,9 @@ async fn export_journal(config: &Config) -> anyhow::Result<()> {
 struct Cli {
     #[arg(long, short, help = "The name of the journal to be exported")]
     journal: String,
+
+    #[arg(long, short, help = "If true will group entries by their journal")]
+    group_by_journal: bool,
 
     #[arg(long, short, help = "Path to the dayone sqlite database")]
     database: PathBuf,
@@ -67,10 +67,12 @@ impl From<Cli> for Config {
             journal_name: cli.journal,
             database_file: cli.database,
 
-            vault_root: cli.vault,
-            new_entries_location: cli.default_output,
-
-            should_update_existing: cli.should_update_existing,
+            vault: Vault {
+                root: cli.vault.clone(),
+                default_export: cli.default_output.clone(),
+                should_update_existing: cli.should_update_existing,
+                group_by_journal: cli.group_by_journal,
+            },
         }
     }
 }
