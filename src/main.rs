@@ -4,7 +4,6 @@
 
 mod walk;
 mod db;
-mod basic;
 mod entry;
 
 use std::fmt::Debug;
@@ -13,8 +12,7 @@ use anyhow::Context;
 use sqlx::{ConnectOptions, Executor, Row, SqliteConnection};
 use sqlx::sqlite::SqliteConnectOptions;
 use futures::{Stream, TryStreamExt};
-use clap::Parser;
-use crate::basic::walk_export;
+use clap::{Arg, Parser};
 use crate::walk::Vault;
 
 struct Config {
@@ -39,7 +37,7 @@ async fn export_journal(config: &Config) -> anyhow::Result<()> {
         should_overwrite_existing: config.should_overwrite_existing,
     };
 
-    walk_export(&vault, &mut entries).await?;
+    vault.export_entries(&mut entries).await?;
 
     Ok(())
 }
@@ -47,19 +45,19 @@ async fn export_journal(config: &Config) -> anyhow::Result<()> {
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Cli {
-    #[arg(long, short)]
+    #[arg(long, short, help = "THe name of the journal to be exported")]
     journal: String,
 
-    #[arg(long, short)]
+    #[arg(long, short, help = "Path to the dayone sqlite database")]
     database: PathBuf,
 
-    #[arg(long, short)]
+    #[arg(long, short, help = "The root of the vault which will be searched for existing entries")]
     vault: PathBuf,
 
-    #[arg(long, short)]
+    #[arg(long, short = 'o', help = "Where to place new entries that have not yet been exported")]
     default_output: PathBuf,
 
-    #[arg(short = 'w', long = "overwrite")]
+    #[arg(short = 'w', long = "overwrite", help = "If we should write over file which have been")]
     should_overwrite_existing: bool,
 }
 
