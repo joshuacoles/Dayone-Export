@@ -1,6 +1,9 @@
 use time::OffsetDateTime;
 use serde::{Deserialize, Serialize};
 use time::macros::format_description;
+use walkdir::DirEntry;
+use std::fs;
+use itertools::Itertools;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct EntryMetadata {
@@ -80,4 +83,35 @@ impl Entry {
             self.title().replace("/", " "),
         )
     }
+}
+
+pub fn parse_entry(p0: &DirEntry) -> Option<Entry> {
+    let contents = fs::read_to_string(p0.path()).expect("Failed to read existing entry");
+    let mut lines = contents.lines();
+
+    let first_line = lines.next()?;
+
+    if first_line != "---" {
+        return None;
+    }
+
+    let metadata_block = lines
+        .take_while_ref(|line| *line != "---")
+        .join("\n");
+
+    let metadata = serde_yaml::from_str::<EntryMetadata>(&metadata_block).ok()?;
+
+    if !metadata.validate() {
+        return None;
+    }
+
+    // Read next "---" which is left by the take while
+    lines.next()?;
+
+    let rest = lines.join("\n");
+
+    Some(Entry {
+        metadata,
+        markdown: rest,
+    })
 }
