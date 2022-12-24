@@ -1,4 +1,3 @@
-use std::fmt::format;
 use std::path::PathBuf;
 use filetime::{FileTime, set_file_times};
 use crate::{Stream, TryStreamExt};
@@ -13,11 +12,11 @@ pub async fn basic_export(entries: &mut (impl Stream<Item = sqlx::Result<Entry>>
         let file_path = journal_root.join(file_name);
 
         tokio::fs::write(&file_path, entry.contents()).await
-            .context(format!("Writing entry {} to '{:?}'", entry.uuid, &file_path))?;
+            .context(format!("Writing entry {} to '{:?}'", entry.metadata.uuid, &file_path))?;
 
         set_file_times(
             &file_path,
-            FileTime::from_unix_time(entry.creation_date.unix_timestamp(), 0),
+            FileTime::from_unix_time(entry.metadata.creation_date.unix_timestamp(), 0),
             FileTime::now(),
         )?;
     }
@@ -25,13 +24,7 @@ pub async fn basic_export(entries: &mut (impl Stream<Item = sqlx::Result<Entry>>
     Ok(())
 }
 
-pub async fn walk_export(entries: &mut (impl Stream<Item = sqlx::Result<Entry>> + Unpin)) -> Result<()> {
-    let vault = Vault {
-        root: PathBuf::from("/Users/joshuacoles/Developer/checkouts/joshuacoles/dayone-export-standalone/out"),
-        default_export: PathBuf::from("/Users/joshuacoles/Developer/checkouts/joshuacoles/dayone-export-standalone/out/journals"),
-        should_overwrite_existing: true,
-    };
-
+pub async fn walk_export(vault: &Vault, entries: &mut (impl Stream<Item = sqlx::Result<Entry>> + Unpin)) -> Result<()> {
     vault.export_entries(entries).await?;
 
     Ok(())

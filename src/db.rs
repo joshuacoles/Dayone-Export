@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use time::{PrimitiveDateTime, UtcOffset};
 use crate::{ConnectOptions, Executor, Row, SqliteConnection, SqliteConnectOptions, Stream, TryStreamExt};
-use crate::entry::Entry;
+use crate::entry::{Entry, EntryMetadata};
 
 pub async fn connect_db(database_file: &PathBuf) -> sqlx::Result<SqliteConnection> {
     SqliteConnectOptions::new()
@@ -46,10 +46,12 @@ pub fn entries_for_journal(conn: &mut SqliteConnection, id: i64) -> impl Stream<
     ").bind(id));
 
     entries.map_ok(|row| Entry {
-        uuid: row.get("uuid"),
-        journal: row.get("journal"),
         markdown: row.get("markdown"),
-        creation_date: row.get::<'_, PrimitiveDateTime, _>("creation_date").assume_offset(UtcOffset::UTC),
-        modified_date: row.get::<'_, PrimitiveDateTime, _>("modified_date").assume_offset(UtcOffset::UTC),
+        metadata: EntryMetadata::new(
+            row.get("journal"),
+            row.get("uuid"),
+            row.get::<'_, PrimitiveDateTime, _>("creation_date").assume_offset(UtcOffset::UTC),
+            row.get::<'_, PrimitiveDateTime, _>("modified_date").assume_offset(UtcOffset::UTC)
+        ),
     })
 }

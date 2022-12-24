@@ -13,46 +13,66 @@ use anyhow::Context;
 use sqlx::{ConnectOptions, Executor, Row, SqliteConnection};
 use sqlx::sqlite::SqliteConnectOptions;
 use futures::{Stream, TryStreamExt};
+use clap::Parser;
+use crate::basic::walk_export;
+use crate::walk::Vault;
 
 struct Config {
     journal_name: String,
-    export_root: PathBuf,
     database_file: PathBuf,
+
+    vault_root: PathBuf,
+    new_entries_location: PathBuf,
+    should_overwrite_existing: bool,
 }
 
 async fn export_journal(config: &Config) -> anyhow::Result<()> {
     let mut conn = db::connect_db(&config.database_file).await.expect("Failed to connect to database");
     let mut entries = db::get_entries(&mut conn, &config.journal_name).await.expect("Failed read entries from database");
 
-    let journal_root = config.export_root.join(config.journal_name.replace('/', "-"));
-    tokio::fs::create_dir_all(&journal_root).await.context("Creating root")?;
+    tokio::fs::create_dir_all(&config.new_entries_location)
+        .await.context("Creating new entries export location")?;
 
-    basic_export(&mut entries, journal_root).await?;
-    // walk_export(&mut entries).await?;
+    let vault = Vault {
+        root: config.vault_root.clone(),
+        default_export: config.new_entries_location.clone(),
+        should_overwrite_existing: config.should_overwrite_existing,
+    };
+
+    walk_export(&vault, &mut entries).await?;
 
     Ok(())
 }
-
-use clap::Parser;
-use crate::basic::{basic_export, walk_export};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Cli {
     #[arg(long, short)]
     journal: String,
-    #[arg(long, short)]
-    output: PathBuf,
+
     #[arg(long, short)]
     database: PathBuf,
+
+    #[arg(long, short)]
+    vault: PathBuf,
+
+    #[arg(long, short)]
+    default_output: PathBuf,
+
+    #[arg(short = 'w', long = "overwrite")]
+    should_overwrite_existing: bool,
 }
 
 impl From<Cli> for Config {
     fn from(cli: Cli) -> Self {
         Config {
             journal_name: cli.journal,
-            export_root: cli.output,
             database_file: cli.database,
+
+            vault_root: cli.vault,
+            new_entries_location: cli.default_output,
+
+            should_overwrite_existing: cli.should_overwrite_existing,
         }
     }
 }

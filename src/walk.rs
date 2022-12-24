@@ -1,8 +1,6 @@
 use std::collections::HashMap;
 use std::fs;
-use std::future::Future;
 use std::path::PathBuf;
-use std::process::exit;
 use futures::TryStreamExt;
 use walkdir::{DirEntry, WalkDir};
 use crate::Stream;
@@ -34,9 +32,9 @@ fn parse_entry(p0: &DirEntry) -> Option<Entry> {
         .take_while_ref(|line| *line != "---")
         .join("\n");
 
-    let meta = serde_yaml::from_str::<EntryMetadata>(&metadata_block).ok()?;
+    let metadata = serde_yaml::from_str::<EntryMetadata>(&metadata_block).ok()?;
 
-    if !meta.validate() {
+    if !metadata.validate() {
         return None
     }
 
@@ -46,10 +44,7 @@ fn parse_entry(p0: &DirEntry) -> Option<Entry> {
     let rest = lines.join("\n");
 
     Some(Entry {
-        journal: meta.journal,
-        uuid: meta.uuid,
-        creation_date: meta.creation_date,
-        modified_date: meta.modified_date,
+        metadata,
         markdown: rest,
     })
 }
@@ -67,7 +62,7 @@ impl Vault {
             .filter_map(|e| e.ok())
             .filter_map(|entry| {
                 parse_entry(&entry)
-                    .map(|entry_info| (entry_info.uuid, entry.into_path()))
+                    .map(|entry_info| (entry_info.metadata.uuid, entry.into_path()))
             }).collect();
 
         result
@@ -81,7 +76,7 @@ impl Vault {
         let existing = self.read_existing();
 
         while let Some(entry) = entries.try_next().await? {
-            match existing.get(&entry.uuid) {
+            match existing.get(&entry.metadata.uuid) {
                 Some(path) => {
                     if self.should_overwrite(&entry, path) {
                         tokio::fs::write(path, entry.contents()).await?;
