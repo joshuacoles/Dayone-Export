@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use futures::{Stream, TryStreamExt};
 use walkdir::{DirEntry, WalkDir};
 use crate::entry::{Entry, parse_entry};
 
@@ -37,14 +36,14 @@ impl Vault {
         result
     }
 
-    pub async fn export_entries(&self, entries: &mut (impl Stream<Item=sqlx::Result<Entry>> + Unpin), existing: &HashMap<String, (PathBuf, Entry)>) -> Result<(), anyhow::Error> {
+    pub async fn export_entries(&self, entries: &Vec<Entry>, existing: &HashMap<String, (PathBuf, Entry)>) -> Result<(), anyhow::Error> {
         println!("Found {} existing entries", existing.len());
 
         if self.should_update_existing {
             println!("These will be overwritten in place with updated content if newer DayOne content is available.");
         }
 
-        while let Some(entry) = entries.try_next().await? {
+        for entry in entries {
             match existing.get(&entry.metadata.uuid) {
                 Some((path, existing_entry)) => {
                     if self.should_update_existing && existing_entry.metadata.modified_date < entry.metadata.modified_date {

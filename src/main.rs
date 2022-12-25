@@ -13,17 +13,15 @@ use std::process::exit;
 use anyhow::Context;
 use sqlx::{ConnectOptions, Executor, Row, SqliteConnection};
 use sqlx::sqlite::SqliteConnectOptions;
-use futures::{Stream, TryStreamExt};
 use clap::Parser;
 use itertools::Itertools;
-use crate::entry::Entry;
 use crate::walk::Vault;
 
 async fn export_journal(cli: &Cli) -> anyhow::Result<()> {
     let vault = cli.vault();
 
     let mut conn = db::connect_db(&cli.database_file).await.expect("Failed to connect to database");
-    let mut entries = db::get_entries(&mut conn, &cli.journal_name).await.expect("Failed read entries from database");
+    let entries = db::get_entries(&mut conn, &cli.journal_name).await.expect("Failed read entries from database");
 
     tokio::fs::create_dir_all(&vault.default_export)
         .await.context("Creating new entries export location")?;
@@ -49,7 +47,6 @@ async fn export_journal(cli: &Cli) -> anyhow::Result<()> {
     if cli.list_stats {
         println!("Journal\tExisting\tIncoming");
 
-        let entries = entries.try_collect::<Vec<Entry>>().await?;
         let incoming_grouped: HashMap<&String, usize> = entries.iter()
             .group_by(|entry| &entry.metadata.journal)
             .into_iter()
@@ -70,15 +67,13 @@ async fn export_journal(cli: &Cli) -> anyhow::Result<()> {
                 incoming_grouped.get(journal).unwrap_or(&0)
             );
         }
-
-        exit(0)
     }
 
     if cli.dry_run {
         exit(0)
     }
 
-    vault.export_entries(&mut entries, &existing_entries).await?;
+    vault.export_entries(&entries, &existing_entries).await?;
 
     Ok(())
 }
@@ -128,5 +123,5 @@ impl Cli {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let cli: Cli = Cli::parse();
-    export_journal(&cli.into()).await
+    export_journal(&cli).await
 }

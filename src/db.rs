@@ -1,6 +1,9 @@
 use std::path::PathBuf;
+use itertools::Itertools;
+use sqlx::sqlite::SqliteRow;
 use time::{PrimitiveDateTime, UtcOffset};
-use crate::{ConnectOptions, Executor, Row, SqliteConnection, SqliteConnectOptions, Stream, TryStreamExt};
+use futures::TryStreamExt;
+use crate::{ConnectOptions, Executor, Row, SqliteConnection, SqliteConnectOptions};
 use crate::entry::{Entry, EntryMetadata};
 
 pub async fn connect_db(database_file: &PathBuf) -> sqlx::Result<SqliteConnection> {
@@ -23,36 +26,54 @@ async fn find_journal(conn: &mut SqliteConnection, name: &str) -> sqlx::Result<i
     Ok(result)
 }
 
-pub async fn get_entries<'a>(conn: &'a mut SqliteConnection, journal_name: &str) -> sqlx::Result<impl Stream<Item=sqlx::Result<Entry>> + Sized  + 'a> {
+pub async fn get_entries(conn: &mut SqliteConnection, journal_name: &str) -> sqlx::Result<Vec<Entry>> {
     let id = find_journal(conn, journal_name).await?;
-    let entries = entries_for_journal(conn, id);
+    let entries = entries_for_journal(conn, id).await?;
     Ok(entries)
 }
 
-pub fn entries_for_journal(conn: &mut SqliteConnection, id: i64) -> impl Stream<Item=sqlx::Result<Entry>> + '_ {
+pub async fn entries_for_journal(conn: &mut SqliteConnection, id: i64) -> sqlx::Result<Vec<Entry>> {
     let entries = conn.fetch(
         sqlx::query("
             select journal.ZNAME                                    as journal,
                    ZUUID                                            as uuid,
                    ZMARKDOWNTEXT                                    as markdown,
                    datetime(ZCREATIONDATE, 'unixepoch', '31 years') as creation_date,
-                   datetime(ZMODIFIEDDATE, 'unixepoch', '31 years') as modified_date
+                   datetime(ZMODIFIEDDATE, 'unixepoch', '31 years') as modified_date,
+                   tag.ZNAME                                        as tag
             from ZENTRY
                      left join ZJOURNAL journal on ZENTRY.ZJOURNAL = journal.Z_PK
                      left join Z_12TAGS tag_entry on ZENTRY.Z_PK = tag_entry.Z_12ENTRIES
                      left join ZTAG tag on tag.Z_PK = tag_entry.Z_45TAGS1
             where journal.Z_PK = ?
               and (tag.ZNAME != 'grateful' or tag.ZNAME is null or tag.ZNAME == 'obsidian');
-    ").bind(id));
+    ").bind(id)).try_collect::<Vec<SqliteRow>>().await?;
 
-    entries.map_ok(|row| Entry {
-        markdown: row.get("markdown"),
-        metadata: EntryMetadata::new(
-            row.get("journal"),
-            row.get("uuid"),
-            row.get::<'_, PrimitiveDateTime, _>("creation_date").assume_offset(UtcOffset::UTC),
-            row.get::<'_, PrimitiveDateTime, _>("modified_date").assume_offset(UtcOffset::UTC),
-            Vec::new(),
-        ),
-    })
+    let entries: Vec<Entry> = entries.iter()
+        .group_by(|row| row.get::<'_, String, _>("uuid"))
+        .into_iter()
+        .map(|(uuid, rows)| {
+            let mut rows = rows.peekable();
+            let row = rows.peek().unwrap();
+            let mut entry = Entry {
+                markdown: row.get("markdown"),
+                metadata: EntryMetadata::new(
+                    row.get("journal"),
+                    uuid,
+                    row.get::<'_, PrimitiveDateTime, _>("creation_date").assume_offset(UtcOffset::UTC),
+                    row.get::<'_, PrimitiveDateTime, _>("modified_date").assume_offset(UtcOffset::UTC),
+                    vec![]
+                ),
+            };
+
+            // BCK: This is done later peeked reference means we can't call map until after extracting the other properties
+            let tags: Vec<String> = rows.map(|row| row.get::<'_, String, _>("tag")).filter(|tag| !tag.is_empty()).collect();
+            entry.metadata.tags = tags;
+            dbg!(&entry.metadata);
+
+            entry
+        })
+        .collect();
+
+    Ok(entries)
 }
