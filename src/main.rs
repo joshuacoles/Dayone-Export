@@ -21,14 +21,15 @@ async fn export_journal(cli: &Cli) -> anyhow::Result<()> {
     let vault = cli.vault();
 
     let mut conn = db::connect_db(&cli.database_file).await.expect("Failed to connect to database");
-    let entries = db::get_entries(&mut conn, &cli.journal_name).await.expect("Failed read entries from database");
+    let entries = db::entries_for_journals(&mut conn, &cli.journals).await.expect("Failed read entries from database");
 
     tokio::fs::create_dir_all(&vault.default_export)
         .await.context("Creating new entries export location")?;
 
     if vault.group_by_journal {
-        tokio::fs::create_dir_all(&vault.default_export.join(&cli.journal_name))
-            .await.context("Creating journal specific new entries export location")?;
+        for journal in &cli.journals {
+            tokio::fs::create_dir_all(&vault.default_export.join(journal))
+                .await.context("Creating journal specific new entries export location")?;        }
     }
 
     let existing_entries = vault.read_existing();
@@ -81,8 +82,8 @@ async fn export_journal(cli: &Cli) -> anyhow::Result<()> {
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Cli {
-    #[arg(long = "journal", short = 'j', help = "The name of the journal to be exported")]
-    journal_name: String,
+    #[arg(long = "journal", short = 'j', help = "The name of a journal to export")]
+    journals: Vec<String>,
 
     #[arg(long, short, help = "If true will group entries by their journal")]
     group_by_journal: bool,

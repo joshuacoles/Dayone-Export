@@ -13,26 +13,18 @@ pub async fn connect_db(database_file: &PathBuf) -> sqlx::Result<SqliteConnectio
         .connect().await
 }
 
-async fn find_journal(conn: &mut SqliteConnection, name: &str) -> sqlx::Result<i64> {
-    let journal = conn.fetch_one(
-        sqlx::query("
-            select Z_PK as id
-            from ZJOURNAL
-            where ZNAME = ?;
-        ").bind(name)
-    ).await?;
+pub async fn entries_for_journals(conn: &mut SqliteConnection, journals: &[String]) -> sqlx::Result<Vec<Entry>> {
+    let mut entries: Vec<Entry> = Vec::new();
 
-    let result: i64 = journal.try_get("id")?;
-    Ok(result)
-}
+    for journal in journals {
+        let mut a = entries_for_journal(conn, journal).await?;
+        entries.append(&mut a);
+    }
 
-pub async fn get_entries(conn: &mut SqliteConnection, journal_name: &str) -> sqlx::Result<Vec<Entry>> {
-    let id = find_journal(conn, journal_name).await?;
-    let entries = entries_for_journal(conn, id).await?;
     Ok(entries)
 }
 
-pub async fn entries_for_journal(conn: &mut SqliteConnection, id: i64) -> sqlx::Result<Vec<Entry>> {
+pub async fn entries_for_journal(conn: &mut SqliteConnection, name: &str) -> sqlx::Result<Vec<Entry>> {
     let entries = conn.fetch(
         sqlx::query("
             select journal.ZNAME                                    as journal,
@@ -45,9 +37,9 @@ pub async fn entries_for_journal(conn: &mut SqliteConnection, id: i64) -> sqlx::
                      left join ZJOURNAL journal on ZENTRY.ZJOURNAL = journal.Z_PK
                      left join Z_12TAGS tag_entry on ZENTRY.Z_PK = tag_entry.Z_12ENTRIES
                      left join ZTAG tag on tag.Z_PK = tag_entry.Z_45TAGS1
-            where journal.Z_PK = ?
+            where journal.ZNAME = ?
               and (tag.ZNAME != 'grateful' or tag.ZNAME is null or tag.ZNAME == 'obsidian');
-    ").bind(id)).try_collect::<Vec<SqliteRow>>().await?;
+    ").bind(name)).try_collect::<Vec<SqliteRow>>().await?;
 
     let entries: Vec<Entry> = entries.iter()
         .group_by(|row| row.get::<'_, String, _>("uuid"))
@@ -62,14 +54,13 @@ pub async fn entries_for_journal(conn: &mut SqliteConnection, id: i64) -> sqlx::
                     uuid,
                     row.get::<'_, PrimitiveDateTime, _>("creation_date").assume_offset(UtcOffset::UTC),
                     row.get::<'_, PrimitiveDateTime, _>("modified_date").assume_offset(UtcOffset::UTC),
-                    vec![]
+                    vec![],
                 ),
             };
 
             // BCK: This is done later peeked reference means we can't call map until after extracting the other properties
             let tags: Vec<String> = rows.map(|row| row.get::<'_, String, _>("tag")).filter(|tag| !tag.is_empty()).collect();
             entry.metadata.tags = tags;
-            dbg!(&entry.metadata);
 
             entry
         })
