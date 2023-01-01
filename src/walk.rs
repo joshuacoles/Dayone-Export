@@ -64,7 +64,7 @@ impl Vault {
                             ..entry.metadata.clone()
                         };
 
-                        let updated_entry = Entry { metadata: updated_metadata, markdown: existing_entry.markdown.clone().trim().to_string() };
+                        let updated_entry = Entry { metadata: updated_metadata, markdown: existing_entry.markdown.clone().trim_start().to_string() };
                         tokio::fs::write(path, updated_entry.contents()).await?;
                     }
                 }
