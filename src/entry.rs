@@ -1,11 +1,13 @@
+use std::collections::HashMap;
 use time::OffsetDateTime;
 use serde::{Deserialize, Serialize};
 use time::macros::format_description;
 use walkdir::DirEntry;
 use std::fs;
 use itertools::Itertools;
+use serde_yaml::Value;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Clone)]
 pub struct EntryMetadata {
     // A constant value of "dayone-import", present in the metadata
     #[serde(rename = "type")]
@@ -24,7 +26,13 @@ pub struct EntryMetadata {
 
     pub link: String,
     
-    pub tags: Vec<String>
+    pub tags: Vec<String>,
+
+    /**
+     * We support additional metadata in the notes, for example if they have been reviewed.
+     */
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
 }
 
 impl EntryMetadata {
@@ -45,6 +53,7 @@ impl EntryMetadata {
 
             creation_date,
             modified_date,
+            extra: HashMap::new(),
         }
     }
 }

@@ -115,7 +115,7 @@ impl Cli {
         Vault {
             root: self.vault.clone(),
             default_export: self.default_output.clone(),
-            should_update_existing: self.should_update_existing,
+            should_update_existing_content: self.should_update_existing,
             group_by_journal: self.group_by_journal,
         }
     }
