@@ -50,7 +50,7 @@ impl Vault {
                     if self.should_update_existing_content && existing_entry.metadata.modified_date < entry.metadata.modified_date {
                         println!("Updating entry at {}", path.to_string_lossy());
                         tokio::fs::write(path, entry.contents()).await?;
-                    } else if existing_entry.metadata != entry.metadata {
+                    } else if existing_entry.metadata != entry.metadata.without_extra_fields() {
                         // If we have new metadata to serve, for example new tags, always update,
                         // but keep content and new metadata fields.
 

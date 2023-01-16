@@ -56,6 +56,13 @@ impl EntryMetadata {
             extra: HashMap::new(),
         }
     }
+
+    pub fn without_extra_fields(&self) -> EntryMetadata {
+        EntryMetadata {
+            extra: HashMap::new(),
+            ..self.clone()
+        }
+    }
 }
 
 #[derive(Debug)]
