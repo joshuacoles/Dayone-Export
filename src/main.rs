@@ -1,4 +1,3 @@
-#![feature(let_else)]
 #![feature(option_result_contains)]
 #![feature(let_chains)]
 
