@@ -36,7 +36,7 @@ pub async fn entries_for_journal(conn: &mut SqliteConnection, name: &str) -> sql
             from ZENTRY
                      left join ZJOURNAL journal on ZENTRY.ZJOURNAL = journal.Z_PK
                      left join Z_12TAGS tag_entry on ZENTRY.Z_PK = tag_entry.Z_12ENTRIES
-                     left join ZTAG tag on tag.Z_PK = tag_entry.Z_45TAGS1
+                     left join ZTAG tag on tag.Z_PK = tag_entry.Z_47TAGS1
             where journal.ZNAME = ?
               and (tag.ZNAME != 'grateful' or tag.ZNAME is null or tag.ZNAME == 'obsidian');
     ").bind(name)).try_collect::<Vec<SqliteRow>>().await?;
