@@ -1,4 +1,3 @@
-#![feature(option_result_contains)]
 #![feature(let_chains)]
 
 mod walk;

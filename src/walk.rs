@@ -11,7 +11,7 @@ fn is_hidden(entry: &DirEntry) -> bool {
 }
 
 fn is_markdown(entry: &DirEntry) -> bool {
-    entry.path().extension().contains(&"md")
+    entry.path().extension().map(|s| s == "md").unwrap_or(false)
 }
 
 pub struct Vault {
