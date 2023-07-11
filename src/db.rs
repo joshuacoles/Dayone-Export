@@ -32,13 +32,9 @@ pub async fn entries_for_journal(conn: &mut SqliteConnection, name: &str) -> sql
                    ZMARKDOWNTEXT                                    as markdown,
                    datetime(ZCREATIONDATE, 'unixepoch', '31 years') as creation_date,
                    datetime(ZMODIFIEDDATE, 'unixepoch', '31 years') as modified_date,
-                   tag.ZNAME                                        as tag
             from ZENTRY
                      left join ZJOURNAL journal on ZENTRY.ZJOURNAL = journal.Z_PK
-                     left join Z_12TAGS tag_entry on ZENTRY.Z_PK = tag_entry.Z_12ENTRIES
-                     left join ZTAG tag on tag.Z_PK = tag_entry.Z_53TAGS1
-            where journal.ZNAME = ?
-              and (tag.ZNAME != 'grateful' or tag.ZNAME is null or tag.ZNAME == 'obsidian');
+            where journal.ZNAME = ?;
     ").bind(name)).try_collect::<Vec<SqliteRow>>().await?;
 
     let entries: Vec<Entry> = entries.iter()
@@ -54,13 +50,13 @@ pub async fn entries_for_journal(conn: &mut SqliteConnection, name: &str) -> sql
                     uuid,
                     row.get::<'_, PrimitiveDateTime, _>("creation_date").assume_offset(UtcOffset::UTC),
                     row.get::<'_, PrimitiveDateTime, _>("modified_date").assume_offset(UtcOffset::UTC),
-                    vec![],
+                    // vec![],
                 ),
             };
 
             // BCK: This is done later peeked reference means we can't call map until after extracting the other properties
-            let tags: Vec<String> = rows.map(|row| row.get::<'_, String, _>("tag")).filter(|tag| !tag.is_empty()).collect();
-            entry.metadata.tags = tags;
+            // let tags: Vec<String> = rows.map(|row| row.get::<'_, String, _>("tag")).filter(|tag| !tag.is_empty()).collect();
+            // entry.metadata.tags = tags;
 
             entry
         })

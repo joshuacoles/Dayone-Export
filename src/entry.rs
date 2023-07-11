@@ -26,7 +26,7 @@ pub struct EntryMetadata {
 
     pub link: String,
     
-    pub tags: Vec<String>,
+    // pub tags: Vec<String>,
 
     /**
      * We support additional metadata in the notes, for example if they have been reviewed.
@@ -42,14 +42,14 @@ impl EntryMetadata {
 }
 
 impl EntryMetadata {
-    pub fn new(journal: String, uuid: String, creation_date: OffsetDateTime, modified_date: OffsetDateTime, tags: Vec<String>) -> EntryMetadata {
+    pub fn new(journal: String, uuid: String, creation_date: OffsetDateTime, modified_date: OffsetDateTime/*, tags: Vec<String>*/) -> EntryMetadata {
         EntryMetadata {
             note_type: "dayone-import".to_string(),
             journal,
 
             link: format!("dayone://view?entryId={}", uuid),
             uuid,
-            tags,
+            // tags,
 
             creation_date,
             modified_date,
@@ -76,6 +76,7 @@ impl Entry {
         &self.metadata
     }
 
+    // TODO: This has issues with unneeded escaping coming out 
     pub fn title(&self) -> String {
         match self.markdown.trim().split('\n').next() {
             Some(first_line) if first_line.starts_with('#') => first_line.replace('#', "").trim().to_string(),
