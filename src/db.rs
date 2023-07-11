@@ -31,7 +31,7 @@ pub async fn entries_for_journal(conn: &mut SqliteConnection, name: &str) -> sql
                    ZUUID                                            as uuid,
                    ZMARKDOWNTEXT                                    as markdown,
                    datetime(ZCREATIONDATE, 'unixepoch', '31 years') as creation_date,
-                   datetime(ZMODIFIEDDATE, 'unixepoch', '31 years') as modified_date,
+                   datetime(ZMODIFIEDDATE, 'unixepoch', '31 years') as modified_date
             from ZENTRY
                      left join ZJOURNAL journal on ZENTRY.ZJOURNAL = journal.Z_PK
             where journal.ZNAME = ?;
