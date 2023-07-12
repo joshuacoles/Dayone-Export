@@ -2,8 +2,8 @@ use std::collections::HashMap;
 use time::OffsetDateTime;
 use serde::{Deserialize, Serialize};
 use time::macros::format_description;
-use walkdir::DirEntry;
 use std::fs;
+use std::path::Path;
 use itertools::Itertools;
 use serde_yaml::Value;
 
@@ -102,8 +102,8 @@ impl Entry {
     }
 }
 
-pub fn parse_entry(p0: &DirEntry) -> Option<Entry> {
-    let contents = fs::read_to_string(p0.path()).expect("Failed to read existing entry");
+pub fn parse_entry(p0: &Path) -> Option<Entry> {
+    let contents = fs::read_to_string(p0).expect("Failed to read existing entry");
     let mut lines = contents.lines();
 
     let first_line = lines.next()?;

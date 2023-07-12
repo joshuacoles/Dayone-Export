@@ -43,7 +43,7 @@ pub async fn entries_for_journal(conn: &mut SqliteConnection, name: &str) -> sql
         .map(|(uuid, rows)| {
             let mut rows = rows.peekable();
             let row = rows.peek().unwrap();
-            let mut entry = Entry {
+            let entry = Entry {
                 markdown: row.get("markdown"),
                 metadata: EntryMetadata::new(
                     row.get("journal"),

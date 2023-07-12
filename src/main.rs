@@ -1,6 +1,6 @@
 #![feature(let_chains)]
 
-mod walk;
+mod exporter;
 mod db;
 mod entry;
 
@@ -13,7 +13,8 @@ use sqlx::{ConnectOptions, Executor, Row, SqliteConnection};
 use sqlx::sqlite::SqliteConnectOptions;
 use clap::Parser;
 use itertools::Itertools;
-use crate::walk::Vault;
+use obsidian_rust_interface::Vault;
+use crate::exporter::ExportConfig;
 
 async fn export_journal(cli: &Cli) -> anyhow::Result<()> {
     let vault = cli.vault();
@@ -109,9 +110,9 @@ struct Cli {
 }
 
 impl Cli {
-    fn vault(&self) -> Vault {
-        Vault {
-            root: self.vault.clone(),
+    fn vault(&self) -> ExportConfig {
+        ExportConfig {
+            vault: Vault::open(&self.vault),
             default_export: self.default_output.clone(),
             should_update_existing_content: self.should_update_existing,
             group_by_journal: self.group_by_journal,

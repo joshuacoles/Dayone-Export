@@ -1,37 +1,22 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use walkdir::{DirEntry, WalkDir};
+use obsidian_rust_interface::Vault;
 use crate::entry::{Entry, EntryMetadata, parse_entry};
 
-fn is_hidden(entry: &DirEntry) -> bool {
-    entry.file_name()
-        .to_str()
-        .map(|s| s.starts_with('.'))
-        .unwrap_or(false)
-}
-
-fn is_markdown(entry: &DirEntry) -> bool {
-    entry.path().extension().map(|s| s == "md").unwrap_or(false)
-}
-
-pub struct Vault {
-    pub root: PathBuf,
+pub struct ExportConfig {
+    pub vault: Vault,
     pub default_export: PathBuf,
     pub should_update_existing_content: bool,
     pub group_by_journal: bool,
 }
 
-impl Vault {
+impl ExportConfig {
     pub(crate) fn read_existing(&self) -> HashMap<String, (PathBuf, Entry)> {
-        let walker = WalkDir::new(&self.root).into_iter();
-        let result: HashMap<String, (PathBuf, Entry)> = walker
-            .filter_entry(|e| !is_hidden(e))
-            .filter_map(|e| e.ok())
-            .filter(|e| !is_hidden(e) && is_markdown(e))
-            .filter_map(|entry| {
-                parse_entry(&entry)
-                    .map(|entry_info| (entry_info.metadata.uuid.clone(), (entry.into_path(), entry_info)))
-            }).collect();
+        let result: HashMap<String, (PathBuf, Entry)> = self.vault.notes()
+            .filter_map(|note| note.ok())
+            .filter_map(|note| parse_entry(note.path()).map(|entry| (note.path().to_path_buf(), entry)))
+            .map(|(path, entry)| (entry.metadata.uuid.clone(), (path, entry)))
+            .collect();
 
         result
     }
@@ -81,6 +66,7 @@ impl Vault {
     }
 }
 
+/// When there is an existing file, we add a (n) suffix to the filename.
 fn number_existing(root: &Path, name: &str, extension: &str) -> PathBuf {
     let mut path = root.join(format!("{}.{}", name, extension));
     let mut i = 2;

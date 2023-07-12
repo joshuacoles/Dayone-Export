@@ -10,14 +10,14 @@ license = "MIT OR Apache-2.0"
 [dependencies]
 filetime = "0.2.18"
 futures = "0.3.25"
-rustls = "0.20.7"
-sqlx = { version = "0.6", features = ["runtime-tokio-rustls", "sqlite", "time"] }
+rustls = "0.21.5"
+sqlx = { version = "0.7.0", features = ["runtime-tokio-rustls", "sqlite", "time"] }
 time = { version = "0.3.17", features = ["parsing", "formatting", "serde"] }
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"
 clap = { version = "4.0.29", features = ["derive"] }
-walkdir = "2.3.2"
-itertools = "0.10.5"
+itertools = "0.11.0"
 anyhow = "1.0.66"
 thiserror = "1.0.30"
+obsidian-rust-interface = { git = "https://github.com/joshuacoles/Obsidian-Rust-Interface", version = "*" }
