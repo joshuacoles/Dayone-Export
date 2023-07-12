@@ -1,11 +1,9 @@
-use std::collections::HashMap;
-use time::OffsetDateTime;
+use obsidian_rust_interface::VaultNote;
 use serde::{Deserialize, Serialize};
-use time::macros::format_description;
-use std::fs;
-use std::path::Path;
-use itertools::Itertools;
 use serde_yaml::Value;
+use std::collections::HashMap;
+use time::macros::format_description;
+use time::OffsetDateTime;
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Clone)]
 pub struct EntryMetadata {
@@ -25,9 +23,8 @@ pub struct EntryMetadata {
     pub modified_date: OffsetDateTime,
 
     pub link: String,
-    
-    // pub tags: Vec<String>,
 
+    // pub tags: Vec<String>,
     /**
      * We support additional metadata in the notes, for example if they have been reviewed.
      */
@@ -42,7 +39,12 @@ impl EntryMetadata {
 }
 
 impl EntryMetadata {
-    pub fn new(journal: String, uuid: String, creation_date: OffsetDateTime, modified_date: OffsetDateTime/*, tags: Vec<String>*/) -> EntryMetadata {
+    pub fn new(
+        journal: String,
+        uuid: String,
+        creation_date: OffsetDateTime,
+        modified_date: OffsetDateTime, /*, tags: Vec<String>*/
+    ) -> EntryMetadata {
         EntryMetadata {
             note_type: "dayone-import".to_string(),
             journal,
@@ -50,7 +52,6 @@ impl EntryMetadata {
             link: format!("dayone://view?entryId={}", uuid),
             uuid,
             // tags,
-
             creation_date,
             modified_date,
             extra: HashMap::new(),
@@ -65,7 +66,7 @@ impl EntryMetadata {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Entry {
     pub metadata: EntryMetadata,
     pub markdown: String,
@@ -76,19 +77,32 @@ impl Entry {
         &self.metadata
     }
 
-    // TODO: This has issues with unneeded escaping coming out 
+    // TODO: This has issues with unneeded escaping coming out
     pub fn title(&self) -> String {
         match self.markdown.trim().split('\n').next() {
-            Some(first_line) if first_line.starts_with('#') => first_line.replace('#', "").trim().to_string(),
-            Some(first_line) if first_line.chars().all(|x| x.is_whitespace() || x.is_alphanumeric()) => first_line.to_string(),
-            _ => self.metadata.creation_date.format(format_description!("[hour]-[minute]-[second]")).expect("Failed to format time")
+            Some(first_line) if first_line.starts_with('#') => {
+                first_line.replace('#', "").trim().to_string()
+            }
+            Some(first_line)
+                if first_line
+                    .chars()
+                    .all(|x| x.is_whitespace() || x.is_alphanumeric()) =>
+            {
+                first_line.to_string()
+            }
+            _ => self
+                .metadata
+                .creation_date
+                .format(format_description!("[hour]-[minute]-[second]"))
+                .expect("Failed to format time"),
         }
     }
 
     pub fn contents(&self) -> String {
         format!(
             "---\n{frontmatter}---\n\n{body}\n",
-            frontmatter = serde_yaml::to_string(self.metadata()).expect("Failed to serialise metadata"),
+            frontmatter =
+                serde_yaml::to_string(self.metadata()).expect("Failed to serialise metadata"),
             body = self.markdown.replace('\\', ""),
         )
     }
@@ -96,39 +110,21 @@ impl Entry {
     pub fn default_filename(&self) -> String {
         format!(
             "{} {}",
-            self.metadata.creation_date.format(format_description!("[year]-[month]-[day]")).expect("Failed to format date"),
+            self.metadata
+                .creation_date
+                .format(format_description!("[year]-[month]-[day]"))
+                .expect("Failed to format date"),
             self.title().replace('/', " "),
         )
     }
 }
 
-pub fn parse_entry(p0: &Path) -> Option<Entry> {
-    let contents = fs::read_to_string(p0).expect("Failed to read existing entry");
-    let mut lines = contents.lines();
-
-    let first_line = lines.next()?;
-
-    if first_line != "---" {
-        return None;
-    }
-
-    let metadata_block = lines
-        .take_while_ref(|line| *line != "---")
-        .join("\n");
-
-    let metadata = serde_yaml::from_str::<EntryMetadata>(&metadata_block).ok()?;
-
-    if !metadata.validate() {
-        return None;
-    }
-
-    // Read next "---" which is left by the take while
-    lines.next()?;
-
-    let rest = lines.join("\n");
+pub fn parse_entry(vn: &VaultNote) -> Option<Entry> {
+    let (metadata, contents) = vn.parts::<EntryMetadata>().ok()?;
+    let metadata = metadata?;
 
     Some(Entry {
         metadata,
-        markdown: rest,
+        markdown: contents,
     })
 }

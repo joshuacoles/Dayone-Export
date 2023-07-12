@@ -1,19 +1,23 @@
-use std::path::PathBuf;
+use crate::entry::{Entry, EntryMetadata};
+use crate::{ConnectOptions, Executor, Row, SqliteConnectOptions, SqliteConnection};
+use futures::TryStreamExt;
 use itertools::Itertools;
 use sqlx::sqlite::SqliteRow;
+use std::path::PathBuf;
 use time::{PrimitiveDateTime, UtcOffset};
-use futures::TryStreamExt;
-use crate::{ConnectOptions, Executor, Row, SqliteConnection, SqliteConnectOptions};
-use crate::entry::{Entry, EntryMetadata};
 
 pub async fn connect_db(database_file: &PathBuf) -> sqlx::Result<SqliteConnection> {
     SqliteConnectOptions::new()
         .filename(database_file)
         .read_only(true)
-        .connect().await
+        .connect()
+        .await
 }
 
-pub async fn entries_for_journals(conn: &mut SqliteConnection, journals: &[String]) -> sqlx::Result<Vec<Entry>> {
+pub async fn entries_for_journals(
+    conn: &mut SqliteConnection,
+    journals: &[String],
+) -> sqlx::Result<Vec<Entry>> {
     let mut entries: Vec<Entry> = Vec::new();
 
     for journal in journals {
@@ -24,9 +28,14 @@ pub async fn entries_for_journals(conn: &mut SqliteConnection, journals: &[Strin
     Ok(entries)
 }
 
-pub async fn entries_for_journal(conn: &mut SqliteConnection, name: &str) -> sqlx::Result<Vec<Entry>> {
-    let entries = conn.fetch(
-        sqlx::query("
+pub async fn entries_for_journal(
+    conn: &mut SqliteConnection,
+    name: &str,
+) -> sqlx::Result<Vec<Entry>> {
+    let entries = conn
+        .fetch(
+            sqlx::query(
+                "
             select journal.ZNAME                                    as journal,
                    ZUUID                                            as uuid,
                    ZMARKDOWNTEXT                                    as markdown,
@@ -35,9 +44,15 @@ pub async fn entries_for_journal(conn: &mut SqliteConnection, name: &str) -> sql
             from ZENTRY
                      left join ZJOURNAL journal on ZENTRY.ZJOURNAL = journal.Z_PK
             where journal.ZNAME = ?;
-    ").bind(name)).try_collect::<Vec<SqliteRow>>().await?;
+    ",
+            )
+            .bind(name),
+        )
+        .try_collect::<Vec<SqliteRow>>()
+        .await?;
 
-    let entries: Vec<Entry> = entries.iter()
+    let entries: Vec<Entry> = entries
+        .iter()
         .group_by(|row| row.get::<'_, String, _>("uuid"))
         .into_iter()
         .map(|(uuid, rows)| {
@@ -48,8 +63,10 @@ pub async fn entries_for_journal(conn: &mut SqliteConnection, name: &str) -> sql
                 metadata: EntryMetadata::new(
                     row.get("journal"),
                     uuid,
-                    row.get::<'_, PrimitiveDateTime, _>("creation_date").assume_offset(UtcOffset::UTC),
-                    row.get::<'_, PrimitiveDateTime, _>("modified_date").assume_offset(UtcOffset::UTC),
+                    row.get::<'_, PrimitiveDateTime, _>("creation_date")
+                        .assume_offset(UtcOffset::UTC),
+                    row.get::<'_, PrimitiveDateTime, _>("modified_date")
+                        .assume_offset(UtcOffset::UTC),
                     // vec![],
                 ),
             };

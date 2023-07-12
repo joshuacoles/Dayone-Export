@@ -1,7 +1,7 @@
+use crate::entry::{parse_entry, Entry, EntryMetadata};
+use obsidian_rust_interface::Vault;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use obsidian_rust_interface::Vault;
-use crate::entry::{Entry, EntryMetadata, parse_entry};
 
 pub struct ExportConfig {
     pub vault: Vault,
@@ -12,16 +12,22 @@ pub struct ExportConfig {
 
 impl ExportConfig {
     pub(crate) fn read_existing(&self) -> HashMap<String, (PathBuf, Entry)> {
-        let result: HashMap<String, (PathBuf, Entry)> = self.vault.notes()
+        let result: HashMap<String, (PathBuf, Entry)> = self
+            .vault
+            .notes()
             .filter_map(|note| note.ok())
-            .filter_map(|note| parse_entry(note.path()).map(|entry| (note.path().to_path_buf(), entry)))
+            .filter_map(|note| parse_entry(&note).map(|entry| (note.path().to_path_buf(), entry)))
             .map(|(path, entry)| (entry.metadata.uuid.clone(), (path, entry)))
             .collect();
 
         result
     }
 
-    pub async fn export_entries(&self, entries: &Vec<Entry>, existing: &HashMap<String, (PathBuf, Entry)>) -> Result<(), anyhow::Error> {
+    pub async fn export_entries(
+        &self,
+        entries: &Vec<Entry>,
+        existing: &HashMap<String, (PathBuf, Entry)>,
+    ) -> Result<(), anyhow::Error> {
         println!("Found {} existing entries", existing.len());
 
         if self.should_update_existing_content {
@@ -32,7 +38,9 @@ impl ExportConfig {
             match existing.get(&entry.metadata.uuid) {
                 Some((path, existing_entry)) => {
                     // If we want to update existing content and we have newer content to serve, replace file entirely.
-                    if self.should_update_existing_content && existing_entry.metadata.modified_date < entry.metadata.modified_date {
+                    if self.should_update_existing_content
+                        && existing_entry.metadata.modified_date < entry.metadata.modified_date
+                    {
                         println!("Updating entry at {}", path.to_string_lossy());
                         tokio::fs::write(path, entry.contents()).await?;
                     } else if existing_entry.metadata != entry.metadata.without_extra_fields() {
@@ -49,13 +57,20 @@ impl ExportConfig {
                             ..entry.metadata.clone()
                         };
 
-                        let updated_entry = Entry { metadata: updated_metadata, markdown: existing_entry.markdown.clone().trim_start().to_string() };
+                        let updated_entry = Entry {
+                            metadata: updated_metadata,
+                            markdown: existing_entry.markdown.clone().trim_start().to_string(),
+                        };
                         tokio::fs::write(path, updated_entry.contents()).await?;
                     }
                 }
 
                 None => {
-                    let parent = if self.group_by_journal { self.default_export.join(&entry.metadata.journal) } else { self.default_export.clone() };
+                    let parent = if self.group_by_journal {
+                        self.default_export.join(&entry.metadata.journal)
+                    } else {
+                        self.default_export.clone()
+                    };
                     let path = number_existing(&parent, &entry.default_filename(), "md");
                     tokio::fs::write(path, entry.contents()).await?;
                 }
