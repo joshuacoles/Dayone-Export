@@ -36,11 +36,11 @@ pub async fn entries_for_journal(
         .fetch(
             sqlx::query(
                 "
-            select journal.ZNAME                                    as journal,
-                   ZUUID                                            as uuid,
-                   ZMARKDOWNTEXT                                    as markdown,
-                   datetime(ZCREATIONDATE, 'unixepoch', '31 years') as creation_date,
-                   datetime(ZMODIFIEDDATE, 'unixepoch', '31 years') as modified_date
+            select journal.ZNAME                                                        as journal,
+                   ZUUID                                                                as uuid,
+                   ZMARKDOWNTEXT                                                        as markdown,
+                   datetime(datetime(ZCREATIONDATE, 'unixepoch', '31 years'), '+1 day') as creation_date,
+                   datetime(datetime(ZMODIFIEDDATE, 'unixepoch', '31 years'), '+1 day') as modified_date
             from ZENTRY
                      left join ZJOURNAL journal on ZENTRY.ZJOURNAL = journal.Z_PK
             where journal.ZNAME = ?;
