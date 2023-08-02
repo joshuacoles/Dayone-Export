@@ -108,13 +108,21 @@ impl Entry {
     }
 
     pub fn default_filename(&self) -> String {
+        // Remove special characters disallowed by obsidian in file names.
+        // If we don't like what comes out we can always rename it.
+        let safe_title = self
+            .title()
+            .replace('/', " ")
+            .replace('\\', " ")
+            .replace(":", " ");
+
         format!(
             "{} {}",
             self.metadata
                 .creation_date
                 .format(format_description!("[year]-[month]-[day]"))
                 .expect("Failed to format date"),
-            self.title().replace('/', " "),
+            safe_title,
         )
     }
 }
