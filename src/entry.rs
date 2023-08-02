@@ -1,4 +1,4 @@
-use obsidian_rust_interface::VaultNote;
+use obsidian_rust_interface::NoteReference;
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
 use std::collections::HashMap;
@@ -119,7 +119,7 @@ impl Entry {
     }
 }
 
-pub fn parse_entry(vn: &VaultNote) -> Option<Entry> {
+pub fn parse_entry(vn: &NoteReference) -> Option<Entry> {
     let (metadata, contents) = vn.parts::<EntryMetadata>().ok()?;
     let metadata = metadata?;
 
