@@ -32,12 +32,6 @@ pub struct EntryMetadata {
 }
 
 impl EntryMetadata {
-    pub fn validate(&self) -> bool {
-        self.note_type == "dayone-import"
-    }
-}
-
-impl EntryMetadata {
     pub fn new(
         journal: String,
         uuid: String,

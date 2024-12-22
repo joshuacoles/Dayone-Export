@@ -121,14 +121,14 @@ async fn export_journal(cli: &Cli) -> anyhow::Result<()> {
 
         let incoming_grouped: HashMap<&String, usize> = entries
             .iter()
-            .group_by(|entry| &entry.metadata.journal)
+            .chunk_by(|entry| &entry.metadata.journal)
             .into_iter()
             .map(|(journal, group)| (journal, group.count()))
             .collect();
 
         let existing_grouped: HashMap<&String, usize> = existing_entries
             .values()
-            .group_by(|(_, entry)| &entry.metadata.journal)
+            .chunk_by(|(_, entry)| &entry.metadata.journal)
             .into_iter()
             .map(|(journal, group)| (journal, group.count()))
             .collect();

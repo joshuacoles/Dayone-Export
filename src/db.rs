@@ -53,7 +53,7 @@ pub async fn entries_for_journal(
 
     let entries: Vec<Entry> = entries
         .iter()
-        .group_by(|row| row.get::<'_, String, _>("uuid"))
+        .chunk_by(|row| row.get::<'_, String, _>("uuid"))
         .into_iter()
         .map(|(uuid, rows)| {
             let mut rows = rows.peekable();
