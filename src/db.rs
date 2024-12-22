@@ -1,5 +1,5 @@
 use crate::entry::{Entry, EntryMetadata};
-use crate::{ConnectOptions, Executor, Row, SqliteConnectOptions, SqliteConnection};
+use crate::{ConnectOptions, Filters, Row, SqliteConnectOptions, SqliteConnection};
 use chrono::NaiveDateTime;
 use futures::TryStreamExt;
 use itertools::Itertools;
@@ -12,41 +12,6 @@ pub async fn connect_db(database_file: &PathBuf) -> sqlx::Result<SqliteConnectio
         .read_only(true)
         .connect()
         .await
-}
-
-pub async fn entries_for_journals(
-    conn: &mut SqliteConnection,
-    journals: &[String],
-) -> sqlx::Result<Vec<Entry>> {
-    let mut entries: Vec<Entry> = Vec::new();
-
-    for journal in journals {
-        let mut a = entries_for_journal(conn, journal).await?;
-        entries.append(&mut a);
-    }
-
-    Ok(entries)
-}
-
-pub async fn all_entries(conn: &mut SqliteConnection) -> sqlx::Result<Vec<Entry>> {
-    let entries = conn
-        .fetch(
-            sqlx::query(
-                "
-            select journal.ZNAME                                                        as journal,
-                   ZUUID                                                                as uuid,
-                   ZMARKDOWNTEXT                                                        as markdown,
-                   datetime(datetime(ZCREATIONDATE, 'unixepoch', '31 years'), '+1 day') as creation_date,
-                   datetime(datetime(ZMODIFIEDDATE, 'unixepoch', '31 years'), '+1 day') as modified_date
-            from ZENTRY
-                     left join ZJOURNAL journal on ZENTRY.ZJOURNAL = journal.Z_PK;
-            ",
-            ),
-        )
-        .try_collect::<Vec<SqliteRow>>()
-        .await?;
-
-    Ok(rows_to_entries(&entries))
 }
 
 fn rows_to_entries(rows: &[SqliteRow]) -> Vec<Entry> {
@@ -69,14 +34,9 @@ fn rows_to_entries(rows: &[SqliteRow]) -> Vec<Entry> {
         .collect()
 }
 
-pub async fn entries_for_journal(
-    conn: &mut SqliteConnection,
-    name: &str,
-) -> sqlx::Result<Vec<Entry>> {
-    let entries = conn
-        .fetch(
-            sqlx::query(
-                "
+pub async fn entries_for_filter(conn: &mut SqliteConnection, filters: &Filters) -> sqlx::Result<Vec<Entry>> {
+    let mut query_builder = sqlx::QueryBuilder::new(
+        "
             select journal.ZNAME                                                        as journal,
                    ZUUID                                                                as uuid,
                    ZMARKDOWNTEXT                                                        as markdown,
@@ -84,11 +44,39 @@ pub async fn entries_for_journal(
                    datetime(datetime(ZMODIFIEDDATE, 'unixepoch', '31 years'), '+1 day') as modified_date
             from ZENTRY
                      left join ZJOURNAL journal on ZENTRY.ZJOURNAL = journal.Z_PK
-            where journal.ZNAME = ?;
-    ",
-            )
-            .bind(name),
-        )
+        "
+    );
+
+    let mut where_added = false;
+
+    // Add journal filter if journals are specified
+    if let Some(journals) = &filters.only_journals && !journals.is_empty() {
+        query_builder.push(" WHERE journal.ZNAME IN (");
+        let mut separated = query_builder.separated(", ");
+        for journal in journals {
+            separated.push_bind(journal);
+        }
+        separated.push_unseparated(")");
+        where_added = true;
+    }
+
+    // Add creation date filters if specified
+    if let Some(after) = &filters.after {
+        query_builder.push(if where_added { " AND " } else { " WHERE " });
+        query_builder.push(" ZCREATIONDATE >= strftime('%s', ?) - 978307200 ");
+        query_builder.push_bind(after.to_rfc3339());
+        where_added = true;
+    }
+
+    if let Some(before) = &filters.before {
+        query_builder.push(if where_added { " AND " } else { " WHERE " });
+        query_builder.push(" ZCREATIONDATE <= strftime('%s', ?) - 978307200 ");
+        query_builder.push_bind(before.to_rfc3339());
+    }
+
+    let entries = query_builder
+        .build()
+        .fetch(conn)
         .try_collect::<Vec<SqliteRow>>()
         .await?;
 

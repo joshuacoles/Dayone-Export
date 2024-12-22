@@ -2,10 +2,8 @@
 name = "dayone-export"
 version = "0.5.2"
 edition = "2021"
-authors = ["Josh C"]
+authors = ["Joshua Coles <me@joshuacoles.me>"]
 license = "MIT OR Apache-2.0"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 futures = "0.3"

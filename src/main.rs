@@ -6,14 +6,21 @@ mod exporter;
 
 use crate::exporter::ExportConfig;
 use anyhow::Context;
+use chrono::{DateTime, NaiveDate, NaiveTime, Utc};
 use clap::Parser;
 use itertools::Itertools;
 use obsidian_rust_interface::Vault;
 use sqlx::sqlite::SqliteConnectOptions;
-use sqlx::{ConnectOptions, Executor, Row, SqliteConnection};
+use sqlx::{ConnectOptions, Row, SqliteConnection};
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::path::PathBuf;
+
+struct Filters {
+    only_journals: Option<Vec<String>>,
+    after: Option<DateTime<Utc>>,
+    before: Option<DateTime<Utc>>,
+}
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -24,6 +31,18 @@ struct Cli {
         help = "The name of a journal to export. If none are provided, all journals will be exported"
     )]
     journals: Option<Vec<String>>,
+
+    #[arg(
+        long = "after",
+        help = "Filter entries created after this date (format: YYYY-MM-DD)"
+    )]
+    after: Option<String>,
+
+    #[arg(
+        long = "before",
+        help = "Filter entries created before this date (format: YYYY-MM-DD)"
+    )]
+    before: Option<String>,
 
     #[arg(long, short, help = "If true will group entries by their journal")]
     group_by_journal: bool,
@@ -78,6 +97,32 @@ impl Cli {
             group_by_journal: self.group_by_journal,
         }
     }
+
+    fn parse_date_time(string: &str) -> anyhow::Result<DateTime<Utc>> {
+        if let Some(date_time) = DateTime::parse_from_rfc3339(string).ok() {
+            return Ok(date_time.into());
+        }
+
+        if let Some(date) = NaiveDate::parse_from_str(string, "YYYY-mm-dd").ok() {
+            return Ok(date.and_time(NaiveTime::default()).and_utc());
+        }
+
+        Err(anyhow::anyhow!("Could not parse date"))
+    }
+
+    fn entry_filters(&self) -> Filters {
+        Filters {
+            only_journals: self.journals.clone(),
+            after: self
+                .after
+                .clone()
+                .map(|after| Self::parse_date_time(&after).expect("Failed to parse after date")),
+            before: self
+                .before
+                .clone()
+                .map(|before| Self::parse_date_time(&before).expect("Failed to parse before date")),
+        }
+    }
 }
 
 async fn export_journal(cli: &Cli) -> anyhow::Result<()> {
@@ -87,15 +132,9 @@ async fn export_journal(cli: &Cli) -> anyhow::Result<()> {
         .await
         .expect("Failed to connect to database");
 
-    let entries = if let Some(journals) = &cli.journals {
-        db::entries_for_journals(&mut conn, journals)
-            .await
-            .expect("Failed read entries from database")
-    } else {
-        db::all_entries(&mut conn)
-            .await
-            .expect("Failed read entries from database")
-    };
+    let entries = db::entries_for_filter(&mut conn, &cli.entry_filters())
+        .await
+        .expect("Failed read entries from database");
 
     tokio::fs::create_dir_all(&export_config.default_export)
         .await
