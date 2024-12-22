@@ -21,9 +21,9 @@ struct Cli {
     #[arg(
         long = "journal",
         short = 'j',
-        help = "The name of a journal to export"
+        help = "The name of a journal to export. If none are provided, all journals will be exported"
     )]
-    journals: Vec<String>,
+    journals: Option<Vec<String>>,
 
     #[arg(long, short, help = "If true will group entries by their journal")]
     group_by_journal: bool,
@@ -87,16 +87,30 @@ async fn export_journal(cli: &Cli) -> anyhow::Result<()> {
         .await
         .expect("Failed to connect to database");
 
-    let entries = db::entries_for_journals(&mut conn, &cli.journals)
-        .await
-        .expect("Failed read entries from database");
+    let entries = if let Some(journals) = &cli.journals {
+        db::entries_for_journals(&mut conn, journals)
+            .await
+            .expect("Failed read entries from database")
+    } else {
+        db::all_entries(&mut conn)
+            .await
+            .expect("Failed read entries from database")
+    };
 
     tokio::fs::create_dir_all(&export_config.default_export)
         .await
         .context("Creating new entries export location")?;
 
+    let journals_to_export = cli.journals.clone().unwrap_or_else(|| {
+        entries
+            .iter()
+            .map(|entry| entry.metadata.journal.clone())
+            .unique()
+            .collect_vec()
+    });
+
     if export_config.group_by_journal {
-        for journal in &cli.journals {
+        for journal in journals_to_export {
             tokio::fs::create_dir_all(&export_config.default_export.join(journal))
                 .await
                 .context("Creating journal specific new entries export location")?;
