@@ -1,9 +1,8 @@
 use obsidian_rust_interface::NoteReference;
 use serde::{Deserialize, Serialize};
-use serde_yaml::Value;
+use serde_yml::Value;
 use std::collections::HashMap;
-use time::macros::format_description;
-use time::OffsetDateTime;
+use chrono::{DateTime, Utc};
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Clone)]
 pub struct EntryMetadata {
@@ -16,11 +15,11 @@ pub struct EntryMetadata {
     #[serde(rename = "dayoneId")]
     pub uuid: String,
 
-    #[serde(rename = "createdAt", with = "time::serde::rfc3339")]
-    pub creation_date: OffsetDateTime,
+    #[serde(rename = "createdAt")]
+    pub creation_date: DateTime<Utc>,
 
-    #[serde(rename = "lastModifiedAt", with = "time::serde::rfc3339")]
-    pub modified_date: OffsetDateTime,
+    #[serde(rename = "lastModifiedAt")]
+    pub modified_date: DateTime<Utc>,
 
     pub link: String,
 
@@ -42,8 +41,8 @@ impl EntryMetadata {
     pub fn new(
         journal: String,
         uuid: String,
-        creation_date: OffsetDateTime,
-        modified_date: OffsetDateTime, /*, tags: Vec<String>*/
+        creation_date: DateTime<Utc>,
+        modified_date: DateTime<Utc>, /*, tags: Vec<String>*/
     ) -> EntryMetadata {
         EntryMetadata {
             note_type: "dayone-import".to_string(),
@@ -93,8 +92,8 @@ impl Entry {
             _ => self
                 .metadata
                 .creation_date
-                .format(format_description!("[hour]-[minute]-[second]"))
-                .expect("Failed to format time"),
+                .format("%H-%M-%S")
+                .to_string(),
         }
     }
 
@@ -102,7 +101,7 @@ impl Entry {
         format!(
             "---\n{frontmatter}---\n\n{body}\n",
             frontmatter =
-                serde_yaml::to_string(self.metadata()).expect("Failed to serialise metadata"),
+                serde_yml::to_string(self.metadata()).expect("Failed to serialise metadata"),
             body = self.markdown.replace('\\', ""),
         )
     }
@@ -120,8 +119,7 @@ impl Entry {
             "{} {}",
             self.metadata
                 .creation_date
-                .format(format_description!("[year]-[month]-[day]"))
-                .expect("Failed to format date"),
+                .format("%Y-%m-%d"),
             safe_title,
         )
     }

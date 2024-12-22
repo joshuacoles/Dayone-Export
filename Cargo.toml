@@ -10,7 +10,7 @@ license = "MIT OR Apache-2.0"
 [dependencies]
 futures = "0.3"
 sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "sqlite", "chrono"] }
-chrono = "0.4"
+chrono = { version = "0.4", features = ["serde"] }
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_yml = "0.0.12"

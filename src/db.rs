@@ -4,7 +4,7 @@ use futures::TryStreamExt;
 use itertools::Itertools;
 use sqlx::sqlite::SqliteRow;
 use std::path::PathBuf;
-use time::{PrimitiveDateTime, UtcOffset};
+use chrono::NaiveDateTime;
 
 pub async fn connect_db(database_file: &PathBuf) -> sqlx::Result<SqliteConnection> {
     SqliteConnectOptions::new()
@@ -63,18 +63,12 @@ pub async fn entries_for_journal(
                 metadata: EntryMetadata::new(
                     row.get("journal"),
                     uuid,
-                    row.get::<'_, PrimitiveDateTime, _>("creation_date")
-                        .assume_offset(UtcOffset::UTC),
-                    row.get::<'_, PrimitiveDateTime, _>("modified_date")
-                        .assume_offset(UtcOffset::UTC),
-                    // vec![],
+                    row.get::<'_, NaiveDateTime, _>("creation_date")
+                        .and_utc(),
+                    row.get::<'_, NaiveDateTime, _>("modified_date")
+                        .and_utc(),
                 ),
             };
-
-            // BCK: This is done later peeked reference means we can't call map until after extracting the other properties
-            // let tags: Vec<String> = rows.map(|row| row.get::<'_, String, _>("tag")).filter(|tag| !tag.is_empty()).collect();
-            // entry.metadata.tags = tags;
-
             entry
         })
         .collect();
